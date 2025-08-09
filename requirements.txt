@@ -1,0 +1,17 @@
+# Core
+numpy==1.23.5
+
+# Images & Video
+opencv-python==4.9.0.80
+Pillow==10.2.0
+
+# PyTorch stack (required by facenet-pytorch 2.6.0)
+torch==2.2.2
+torchvision==0.17.2
+facenet-pytorch==2.6.0
+
+# Face detector
+retina-face==0.0.17
+
+# Utils
+tqdm==4.67.1
