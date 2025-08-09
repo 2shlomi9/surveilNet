@@ -1,0 +1,12 @@
+torch>=2.2
+torchvision>=0.17
+facenet-pytorch>=2.6
+retinaface>=0.0.13
+opencv-python>=4.9
+Pillow>=10.3
+faiss-cpu>=1.8
+pyodbc>=5.1
+SQLAlchemy>=2.0
+PyYAML>=6.0
+pydantic>=2.7
+tqdm>=4.66

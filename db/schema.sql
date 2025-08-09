@@ -1,0 +1,67 @@
+CREATE TABLE IF NOT EXISTS dbo.Cameras (
+    CameraId INT IDENTITY PRIMARY KEY,
+    Name NVARCHAR(100) NOT NULL,
+    Location NVARCHAR(200) NULL,
+    RtspUrl NVARCHAR(500) NULL,
+    IsActive BIT NOT NULL DEFAULT 1,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE IF NOT EXISTS dbo.Videos (
+    VideoId INT IDENTITY PRIMARY KEY,
+    CameraId INT NULL REFERENCES dbo.Cameras(CameraId),
+    SourcePath NVARCHAR(500) NULL,
+    StartTimeUtc DATETIME2 NULL,
+    EndTimeUtc DATETIME2 NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE IF NOT EXISTS dbo.FaceAppearances (
+    AppearanceId BIGINT IDENTITY PRIMARY KEY,
+    CameraId INT NULL REFERENCES dbo.Cameras(CameraId),
+    VideoId INT NULL REFERENCES dbo.Videos(VideoId),
+    FrameIndex INT NOT NULL,
+    TimestampMs BIGINT NOT NULL,
+    BboxX1 INT NOT NULL,
+    BboxY1 INT NOT NULL,
+    BboxX2 INT NOT NULL,
+    BboxY2 INT NOT NULL,
+    QualityScore FLOAT NULL,
+    ThumbPath NVARCHAR(500) NULL,
+    VectorId BIGINT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE IF NOT EXISTS dbo.VectorMap (
+    VectorId BIGINT PRIMARY KEY,
+    AppearanceId BIGINT NOT NULL UNIQUE REFERENCES dbo.FaceAppearances(AppearanceId),
+    L2Norm FLOAT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE IF NOT EXISTS dbo.Queries (
+    QueryId BIGINT IDENTITY PRIMARY KEY,
+    UserLabel NVARCHAR(200) NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE IF NOT EXISTS dbo.QueryImages (
+    QueryImageId BIGINT IDENTITY PRIMARY KEY,
+    QueryId BIGINT NOT NULL REFERENCES dbo.Queries(QueryId),
+    ImagePath NVARCHAR(500) NOT NULL,
+    Vector VARBINARY(MAX) NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE TABLE IF NOT EXISTS dbo.Matches (
+    MatchId BIGINT IDENTITY PRIMARY KEY,
+    QueryId BIGINT NOT NULL REFERENCES dbo.Queries(QueryId),
+    AppearanceId BIGINT NOT NULL REFERENCES dbo.FaceAppearances(AppearanceId),
+    Score FLOAT NOT NULL,
+    RankK INT NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
+CREATE INDEX IF NOT EXISTS IX_FaceAppearances_Video_Frame ON dbo.FaceAppearances(VideoId, FrameIndex);
+CREATE INDEX IF NOT EXISTS IX_FaceAppearances_Camera_Time ON dbo.FaceAppearances(CameraId, TimestampMs);
+CREATE INDEX IF NOT EXISTS IX_Matches_Query_Rank ON dbo.Matches(QueryId, RankK);
