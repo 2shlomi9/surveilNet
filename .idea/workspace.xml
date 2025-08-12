@@ -4,7 +4,278 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2cafd2fb-7181-4290-961a-384c6e6b6bfd" name="Changes" comment="Designed the code architecture for the future + implementation" />
+    <list default="true" id="2cafd2fb-7181-4290-961a-384c6e6b6bfd" name="Changes" comment="Designed the code architecture for the future + implementation">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extract_faces_from_videos.py" beforeDir="false" afterPath="$PROJECT_DIR$/extract_faces_from_videos.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/detections.csv" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/detections.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000020_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000020_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000020_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000020_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000020_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000020_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000020_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000020_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000025_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000025_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000025_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000025_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000025_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000025_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000025_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000025_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000030_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000030_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000030_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000030_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000030_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000030_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000030_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000030_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000030_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000030_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000030_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000030_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000035_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000035_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000035_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000035_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000035_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000035_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000035_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000035_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000035_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000035_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000035_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000035_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000040_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000040_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000040_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000040_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000040_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000040_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000040_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000040_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000045_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000045_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000045_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000045_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000050_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000050_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000055_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000055_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000055_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000055_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000060_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000060_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000060_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000060_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000060_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000060_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000065_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000065_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000065_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000065_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000065_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000065_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000070_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000070_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000070_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000070_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000070_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000070_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000070_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000070_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000075_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000075_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000075_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000075_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000075_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000075_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000075_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000075_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000080_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000080_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000080_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000080_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000080_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000080_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000080_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000080_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000085_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000085_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000085_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000085_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000085_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000085_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000085_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000085_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000090_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000090_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000090_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000090_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000090_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000090_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000090_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000090_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000090_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000090_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000090_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000090_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000095_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000095_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000095_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000095_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000095_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000095_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000095_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000095_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000095_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000095_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000095_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000095_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000100_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000100_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000100_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000100_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000100_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000100_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000100_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000100_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000100_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000100_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000100_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000100_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000105_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000105_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000105_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000105_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000105_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000105_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000105_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000105_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000105_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000105_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000105_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000105_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000105_face06.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000105_face06.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000110_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000110_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000110_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000110_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000110_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000110_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000110_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000110_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000110_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000110_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000110_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000110_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000110_face06.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000110_face06.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000115_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000115_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000115_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000115_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000115_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000115_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000115_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000115_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000115_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000115_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000115_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000115_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000120_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000120_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000120_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000120_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000120_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000120_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000120_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000120_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000120_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000120_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000120_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000120_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000125_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000125_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000125_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000125_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000125_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000125_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000125_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000125_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000125_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000125_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000125_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000125_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000130_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000130_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000130_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000130_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000130_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000130_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000130_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000130_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000135_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000135_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000135_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000135_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000135_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000135_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000135_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000135_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000135_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000135_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000140_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000140_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000140_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000140_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000140_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000140_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000140_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000140_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000140_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000140_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000140_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000140_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000145_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000145_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000145_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000145_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000145_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000145_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000145_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000145_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000145_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000145_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000145_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000145_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000150_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000150_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000150_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000150_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000150_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000150_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000150_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000150_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000155_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000155_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000155_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000155_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000155_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000155_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000155_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000155_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000160_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000160_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000160_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000160_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000160_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000160_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000160_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000160_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000165_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000165_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000165_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000165_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000165_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000165_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000165_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000165_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000170_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000170_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000170_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000170_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000170_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000170_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000175_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000175_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000175_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000175_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000175_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000175_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000175_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000175_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000180_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000180_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000180_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000180_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000180_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000180_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000180_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000180_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000180_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000180_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000185_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000185_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000185_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000185_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000185_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000185_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000185_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000185_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000185_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000185_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000185_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000185_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000190_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000190_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000190_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000190_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000190_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000190_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000190_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000190_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000190_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000190_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000190_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000190_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000195_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000195_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000195_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000195_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000195_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000195_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000195_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000195_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000195_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000195_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000195_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000195_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000200_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000200_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000200_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000200_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000200_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000200_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000200_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000200_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000200_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000200_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000205_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000205_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000205_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000205_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000205_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000205_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000205_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000205_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000205_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000205_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000210_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000210_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000210_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000210_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000210_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000210_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000215_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000215_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000215_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000215_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000215_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000215_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000220_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000220_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000220_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000220_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000220_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000220_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000220_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000220_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000225_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000225_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000225_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000225_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000225_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000225_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000225_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000225_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000225_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000225_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000230_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000230_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000230_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000230_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000230_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000230_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000230_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000230_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000230_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000230_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000230_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000230_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000235_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000235_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000235_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000235_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000235_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000235_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000235_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000235_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000235_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000235_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000235_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000235_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000240_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000240_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000240_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000240_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000240_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000240_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000240_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000240_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000240_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000240_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000245_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000245_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000245_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000245_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000245_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000245_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000245_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000245_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000245_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000245_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000245_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000245_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000250_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000250_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000250_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000250_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000250_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000250_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000250_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000250_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000250_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000250_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000255_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000255_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000255_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000255_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000255_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000255_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000255_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000255_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000255_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000255_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000260_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000260_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000260_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000260_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000260_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000260_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000260_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000260_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000265_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000265_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000265_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000265_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000265_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000265_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000265_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000265_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000265_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000265_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000270_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000270_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000270_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000270_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000270_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000270_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000270_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000270_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000270_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000270_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000275_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000275_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000275_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000275_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000275_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000275_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000275_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000275_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000275_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000275_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000275_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000275_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000280_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000280_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000280_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000280_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000280_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000280_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000280_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000280_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000280_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000280_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000280_face05.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000280_face05.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000285_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000285_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000285_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000285_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000285_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000285_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000285_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000285_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000290_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000290_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000290_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000290_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000290_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000290_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000290_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000290_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000290_face04.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000290_face04.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000295_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000295_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000295_face01.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000295_face01.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000295_face02.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000295_face02.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000295_face03.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000295_face03.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extracted_faces/video/frame000300_face00.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/extracted_faces/video/frame000300_face00.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -30,13 +301,63 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "main"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;
   }
-}]]></component>
+}</component>
+  <component name="RunManager" selected="Python.extract_faces_from_videos">
+    <configuration name="extract_faces_from_videos" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="surveilNet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/extract_faces_from_videos.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="test" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="surveilNet" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.extract_faces_from_videos" />
+        <item itemvalue="Python.test" />
+      </list>
+    </recent_temporary>
+  </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
@@ -71,5 +392,16 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Designed the code architecture for the future + implementation" />
     <option name="LAST_COMMIT_MESSAGE" value="Designed the code architecture for the future + implementation" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/extract_faces_from_videos.py</url>
+          <line>249</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>
