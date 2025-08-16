@@ -2,7 +2,7 @@
 numpy==1.23.5
 
 # Images & Video
-opencv-python==4.9.0.80
+opencv-contrib-python==4.9.0.80
 Pillow==10.2.0
 
 # PyTorch stack (required by facenet-pytorch 2.6.0)

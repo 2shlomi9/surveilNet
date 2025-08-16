@@ -108,7 +108,7 @@ def process_video_and_save_matches(video_path, database, threshold=0.65, output_
 
 def main():
     gallery_folder = "face_database"
-    video_path = "videos_database/video.mp4"
+    video_path = "videos_database/RossVideo.mp4"
     print("Building face embeddings database...")
     database = build_database(gallery_folder)
     print(f"Database contains {len(database)} people.")
