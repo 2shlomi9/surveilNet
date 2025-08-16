@@ -1,0 +1,11 @@
+rank,score,video,frame_index,timestamp_ms,bbox,face_path,copied_to
+1,1.0000,video,30,1000,"(0,0,82,74)",C:\Users\matan\PycharmProjects\surveilNet\extracted_faces\video\f000030_t1000_face0.jpg,extracted_faces\_search_results\cropped_RonaldoImage1\rank01_score1.0000_vid-video_f000030.jpg
+2,1.0000,video,25,833,"(0,0,70,103)",C:\Users\matan\PycharmProjects\surveilNet\extracted_faces\video\f000025_t833_face6.jpg,extracted_faces\_search_results\cropped_RonaldoImage1\rank02_score1.0000_vid-video_f000025.jpg
+3,1.0000,video,25,833,"(0,0,60,82)",C:\Users\matan\PycharmProjects\surveilNet\extracted_faces\video\f000025_t833_face4.jpg,extracted_faces\_search_results\cropped_RonaldoImage1\rank03_score1.0000_vid-video_f000025.jpg
+4,1.0000,video,25,833,"(0,0,74,93)",C:\Users\matan\PycharmProjects\surveilNet\extracted_faces\video\f000025_t833_face2.jpg,extracted_faces\_search_results\cropped_RonaldoImage1\rank04_score1.0000_vid-video_f000025.jpg
+5,1.0000,video,25,833,"(0,0,71,93)",C:\Users\matan\PycharmProjects\surveilNet\extracted_faces\video\f000025_t833_face1.jpg,extracted_faces\_search_results\cropped_RonaldoImage1\rank05_score1.0000_vid-video_f000025.jpg
+6,1.0000,video,25,833,"(0,0,82,78)",C:\Users\matan\PycharmProjects\surveilNet\extracted_faces\video\f000025_t833_face0.jpg,extracted_faces\_search_results\cropped_RonaldoImage1\rank06_score1.0000_vid-video_f000025.jpg
+7,1.0000,video,20,666,"(0,0,64,87)",C:\Users\matan\PycharmProjects\surveilNet\extracted_faces\video\f000020_t666_face3.jpg,extracted_faces\_search_results\cropped_RonaldoImage1\rank07_score1.0000_vid-video_f000020.jpg
+8,1.0000,video,20,666,"(0,0,69,93)",C:\Users\matan\PycharmProjects\surveilNet\extracted_faces\video\f000020_t666_face2.jpg,extracted_faces\_search_results\cropped_RonaldoImage1\rank08_score1.0000_vid-video_f000020.jpg
+9,1.0000,video,20,666,"(0,0,70,93)",C:\Users\matan\PycharmProjects\surveilNet\extracted_faces\video\f000020_t666_face1.jpg,extracted_faces\_search_results\cropped_RonaldoImage1\rank09_score1.0000_vid-video_f000020.jpg
+10,1.0000,video,20,666,"(0,0,82,73)",C:\Users\matan\PycharmProjects\surveilNet\extracted_faces\video\f000020_t666_face0.jpg,extracted_faces\_search_results\cropped_RonaldoImage1\rank10_score1.0000_vid-video_f000020.jpg

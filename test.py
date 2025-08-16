@@ -1,31 +1,29 @@
-import tensorflow as tf, time, os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "1"  # less verbose
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
-    for gpu in gpus:
-        tf.config.experimental.set_memory_growth(gpu, True)  # optional but helpful
-    tf.debugging.set_log_device_placement(True)  # prints which device runs each op
+import torch, numpy as np
+from facenet_pytorch import InceptionResnetV1
+from torchvision import transforms
+from PIL import Image
 
-    # small warmup
-    x = tf.random.normal([1024, 1024])
-    y = tf.random.normal([1024, 1024])
-    with tf.device('/GPU:0'):
-        _ = tf.matmul(x, y)
+model = InceptionResnetV1(pretrained='vggface2').eval()
+tfm = transforms.Compose([
+    transforms.Resize((160,160)),
+    transforms.ToTensor(),
+    (lambda x: (x - 0.5) / 0.5),  # זהה ל-fixed_image_standardization
+])
 
-    # timing GPU vs CPU
-    a = tf.random.normal([2048, 2048])
-    b = tf.random.normal([2048, 2048])
+def emb(img):
+    with torch.no_grad():
+        t = tfm(img).unsqueeze(0)
+        e = model(t).float()
+        e = torch.nn.functional.normalize(e, p=2, dim=1)
+        return e[0].cpu().numpy()
 
-    t0 = time.time()
-    with tf.device('/GPU:0'):
-        c = tf.matmul(a, b)
-        _ = c.numpy()
-    print("GPU matmul secs:", time.time() - t0)
+black = Image.fromarray(np.zeros((200,200,3), dtype=np.uint8))
+white = Image.fromarray(np.ones((200,200,3), dtype=np.uint8)*255)
+e_black = emb(black); e_white = emb(white)
+print("cos(black, white) =", float(e_black @ e_white))
 
-    t0 = time.time()
-    with tf.device('/CPU:0'):
-        c = tf.matmul(a, b)
-        _ = c.numpy()
-    print("CPU matmul secs:", time.time() - t0)
-else:
-    print("No GPU detected by TensorFlow.")
+# נסה גם שתי תמונות פנים שונות (אחת שלך + אחת אחרת):
+img1 = Image.open(r"query_images\RonaldoImage1.jpeg").convert("RGB")
+img2 = Image.open(r"query_images\MessiImage1.jpg").convert("RGB")
+e1 = emb(img1); e2 = emb(img2)
+print("cos(img1, img2) =", float(e1 @ e2))
