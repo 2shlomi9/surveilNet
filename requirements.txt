@@ -2,7 +2,7 @@
 numpy==1.23.5
 
 # Images & Video
-opencv-python==4.9.0.80
+opencv-contrib-python==4.9.0.80
 Pillow==10.2.0
 
 # PyTorch stack (required by facenet-pytorch 2.6.0)
@@ -13,6 +13,12 @@ facenet-pytorch==2.6.0
 # Face detector
 retina-face==0.0.17
 
+# ANN index
+faiss-cpu==1.7.4
+
 # Utils
 tqdm==4.67.1
 
+# SQL Server
+SQLAlchemy==2.0.32
+pyodbc==5.1.0
