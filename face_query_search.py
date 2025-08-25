@@ -6,6 +6,7 @@ from facenet_pytorch import InceptionResnetV1, MTCNN
 import argparse
 import os
 import cv2
+from video_face_extractor import _load_sqlserver_conn_str
 
 # Init
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -36,8 +37,8 @@ def cosine_similarity(a, b):
 
 
 def search_db(embedding, topk=10):
-    conn = pyodbc.connect(
-        "Driver={ODBC Driver 17 for SQL Server};Server=localhost;Database=FaceRecognitionDB;Trusted_Connection=yes;")
+    # SQL Connection
+    conn = pyodbc.connect(_load_sqlserver_conn_str())
     cursor = conn.cursor()
     cursor.execute("SELECT VideoName, FrameNumber, PersonID, Embedding, BBox_X1, BBox_Y1, BBox_X2, BBox_Y2 FROM FaceEmbeddings")
 
