@@ -6,8 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="2cafd2fb-7181-4290-961a-384c6e6b6bfd" name="Changes" comment="Designed the code architecture for the future + implementation">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/face_query_search.py" beforeDir="false" afterPath="$PROJECT_DIR$/face_query_search.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/video_face_extractor.py" beforeDir="false" afterPath="$PROJECT_DIR$/video_face_extractor.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -83,7 +81,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/face_query_search.py" />
-      <option name="PARAMETERS" value="" />
+      <option name="PARAMETERS" value="--image face_database\ramos_1.png" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
