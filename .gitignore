@@ -1,11 +1,13 @@
 # media & data files
-*.mp4
-*.MP4
-*.jpg
-*.JPG
-*.jpeg
-*.JPEG
-*.png
-*.PNG
-*.csv
-*.CSV
+# *.mp4
+# *.MP4
+# *.jpg
+# *.JPG
+# *.jpeg
+# *.JPEG
+# *.png
+# *.PNG
+# *.csv
+# *.CSV
+configs/serviceAccountKey.json
+configs/accountKey.json
