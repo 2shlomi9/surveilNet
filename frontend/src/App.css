@@ -57,3 +57,15 @@ button {
 button:disabled {
   cursor: not-allowed;
 }
+
+.app-logo {
+  height: 80px;
+  width: auto;
+  margin-right: 10px;
+}
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
