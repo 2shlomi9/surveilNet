@@ -9,36 +9,39 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 mtcnn = MTCNN(image_size=160, margin=0, device=device)
 model = InceptionResnetV1(pretrained="vggface2").eval().to(device)
 
+
 class Absent:
-    def __init__(self, id, first_name, last_name, img_path=None, age=None, embedding=None, main_img=None):
+    def __init__(self, id, first_name, last_name, img_paths, age=None):
         self.id = id
         self.first_name = first_name
         self.last_name = last_name
-        self.img_path = img_path
+        self.img_paths = img_paths if isinstance(img_paths, list) else [img_paths]
         self.age = age
-        self.main_img = main_img
-        self._embedding = np.array(embedding, dtype=np.float32) if embedding is not None else None  
+        self._embeddings = None  # cache embeddings list
 
-    def get_emb(self):
-        """Compute embedding once (if not provided)"""
-        if self._embedding is None and self.img_path:
-            if not os.path.exists(self.img_path):
-                print(f"[ERROR] Image not found: {self.img_path}")
-                return None
+    def get_embs(self):
+        """Compute embeddings for all images once and cache them"""
+        if self._embeddings is None:
+            self._embeddings = []
+            for path in self.img_paths:
+                if not os.path.exists(path):
+                    print(f"[ERROR] Image not found: {path}")
+                    continue
 
-            img = Image.open(self.img_path).convert("RGB")
-            face_tensor = mtcnn(img)
-            if face_tensor is None:
-                print(f"[WARNING] Face not detected in image: {self.img_path}")
-                return None
+                img = Image.open(path).convert("RGB")
+                face_tensor = mtcnn(img)
+                if face_tensor is None:
+                    print(f"[WARNING] Face not detected in image: {path}")
+                    continue
 
-            face_tensor = face_tensor.unsqueeze(0).to(device)
-            with torch.no_grad():
-                emb = model(face_tensor).cpu().numpy()[0]
+                face_tensor = face_tensor.unsqueeze(0).to(device)
+                with torch.no_grad():
+                    emb = model(face_tensor).cpu().numpy()[0]
 
-            self._embedding = emb
-        return self._embedding
-    
+                self._embeddings.append(emb)
+
+        return self._embeddings
+
     def to_string(self):
         return f"id:{self.id}, first name:{self.first_name}, last name:{self.last_name}"
 
@@ -49,7 +52,6 @@ class Absent:
             "first_name": self.first_name,
             "last_name": self.last_name,
             "age": self.age,
-            "embedding": self.get_emb().tolist() if self.get_emb() is not None else None
+            "embeddings": [{"vector": emb.tolist()} for emb in self.get_embs()]
         }
-
 

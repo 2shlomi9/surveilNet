@@ -5,25 +5,27 @@ class FaceMatcher:
         self.db = face_database
 
     def match_embedding(self, embedding, threshold=0.65):
-        """Find the best match in the database for the given embedding"""
-        best_score = -1
-        best_match = None
+        """
+        Find all matches in the database for the given embedding
+        that are above the similarity threshold.
+        Returns a list of tuples: [(person, score), ...]
+        """
+        matches = []
+
+        embedding_norm = embedding / np.linalg.norm(embedding)
 
         for person in self.db.people:
-            db_emb = person.get_emb()
-            if db_emb is None:
+            db_embs = person.get_embs()
+            if not db_embs:
                 continue
 
-            embedding_norm = embedding / np.linalg.norm(embedding)
-            db_emb_norm = db_emb / np.linalg.norm(db_emb)
-            sim = np.dot(embedding_norm, db_emb_norm)
+            for db_emb in db_embs:
+                db_emb_norm = db_emb / np.linalg.norm(db_emb)
+                sim = np.dot(embedding_norm, db_emb_norm)
 
-            if sim > best_score:
-                best_score = sim
-                best_match = person
+                if sim >= threshold:
+                    matches.append((person, sim))
 
-        if best_score >= threshold:
-            return best_match, best_score
-        return None, best_score
-
-
+        # Sort matches by similarity descending
+        matches.sort(key=lambda x: x[1], reverse=True)
+        return matches

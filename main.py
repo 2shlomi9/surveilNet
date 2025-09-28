@@ -24,7 +24,7 @@ if USE_FIRESTORE:
     print(f"[INFO] Loaded {len(face_db.people)} people from Firestore.")
 else:
     # Build database locally from folder and upload to Firestore
-    gallery_folder = "face_database"
+    gallery_folder = "database"
     face_db.build_from_folder(gallery_folder)
     face_db.upload_to_firestore(db)
     print(f"[INFO] Built and uploaded {len(face_db.people)} people from local folder.")
@@ -33,6 +33,7 @@ else:
 matcher = FaceMatcher(face_db)
 
 # --- Video processing ---
+# video_path = "videos_database/video_drown.mp4"
 video_path = "videos_database/video.mp4"
 video_processor = VideoProcessor(matcher, output_folder="matches", frame_skip=5)
 video_processor.process_video(video_path)

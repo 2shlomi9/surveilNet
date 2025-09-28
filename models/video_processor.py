@@ -5,21 +5,12 @@ import numpy as np
 import torch
 from facenet_pytorch import MTCNN, InceptionResnetV1
 import os
-import cv2
-import numpy as np
-from PIL import Image
-from retinaface import RetinaFace
-from facenet_pytorch import InceptionResnetV1, MTCNN
-import torch
 
-# --- Device & models ---
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 mtcnn = MTCNN(image_size=160, margin=0, device=device)
 model = InceptionResnetV1(pretrained="vggface2").eval().to(device)
 
-
 def get_embedding_from_image(img):
-    """Extract embedding from a PIL image"""
     face_tensor = mtcnn(img)
     if face_tensor is None:
         return None
@@ -28,19 +19,16 @@ def get_embedding_from_image(img):
         emb = model(face_tensor).cpu().numpy()[0]
     return emb
 
-
 class VideoProcessor:
     def __init__(self, face_matcher, output_folder="matches", frame_skip=5, threshold=0.65):
         self.matcher = face_matcher
         self.output_folder = output_folder
         self.frame_skip = frame_skip
         self.threshold = threshold
-
         if not os.path.exists(self.output_folder):
             os.makedirs(self.output_folder)
 
     def extract_faces_retina(self, frame_bgr):
-        """Extract faces from frame using RetinaFace and return embeddings + face crops"""
         detections = RetinaFace.detect_faces(frame_bgr)
         faces = []
         if isinstance(detections, dict):
@@ -56,7 +44,6 @@ class VideoProcessor:
         return faces
 
     def process_video(self, video_path):
-        """Run face recognition on video and save matched faces"""
         cap = cv2.VideoCapture(video_path)
         frame_count = 0
 
@@ -69,19 +56,34 @@ class VideoProcessor:
                 continue
 
             print(f"[INFO] Processing frame {frame_count}...")
-            retina_faces = self.extract_faces_retina(frame)
+            try:
+                retina_faces = self.extract_faces_retina(frame)
+            except Exception as e:
+                print(f"[WARNING] Frame {frame_count} skipped due to detection error: {e}")
+                continue
 
-            for i, (embedding, face_img) in enumerate(retina_faces):
-                best_match, score = self.matcher.match_embedding(embedding, self.threshold)
-                if best_match is not None:
-                    print(f"[MATCH] Frame {frame_count}: {best_match.first_name} {best_match.last_name} "
-                          f"(ID={best_match.id}) | Score={score:.2f}")
+            if not retina_faces:
+                print(f"[INFO] Frame {frame_count} has no faces detected, skipping...")
+                continue
 
-                    # Save face with person details in filename
-                    filename = f"frame{frame_count}_id{best_match.id}_{best_match.first_name}_{best_match.last_name}.jpg"
-                    save_path = os.path.join(self.output_folder, filename)
-                    face_img.save(save_path, quality=100)
+            seen_ids = set()  # Track IDs already printed in this frame
+            for embedding, face_img in retina_faces:
+                matches = self.matcher.match_embedding(embedding, threshold=0.0)
+                if matches:
+                    best_person, best_score = matches[0]
+                    if best_person.id in seen_ids:
+                        continue  # Skip duplicate ID for this frame
+                    seen_ids.add(best_person.id)
+
+                    if best_score >= self.threshold:
+                        filename = f"frame{frame_count}_id{best_person.id}_{best_person.first_name}_{best_person.last_name}.jpg"
+                        save_path = os.path.join(self.output_folder, filename)
+                        face_img.save(save_path, quality=100)
+                        print(f"[MATCH] Frame {frame_count}: {best_person.first_name} {best_person.last_name} "
+                            f"(ID={best_person.id}) | Score={best_score:.2f} [SAVED]")
+                    else:
+                        print(f"[NO MATCH] Frame {frame_count}: {best_person.first_name} {best_person.last_name} "
+                            f"(ID={best_person.id}) | Score={best_score:.2f}")
 
         cap.release()
         print("[INFO] Video processing completed.")
-

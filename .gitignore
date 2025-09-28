@@ -1,13 +1,5 @@
-# # media & data files
-# *.mp4
-# *.MP4
-# *.jpg
-# *.JPG
-# *.jpeg
-# *.JPEG
-# *.png
-# *.PNG
-# *.csv
-# *.CSV
-configs/serviceAccountKey.json
+# media & data files
+
 configs/accountKey.json
+matches
+face_database

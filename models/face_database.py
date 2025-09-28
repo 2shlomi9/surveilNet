@@ -1,6 +1,7 @@
+
 import os
 from models.absent import Absent
-
+import numpy as np
 
 class FaceDatabase:
     def __init__(self):
@@ -27,9 +28,10 @@ class FaceDatabase:
                 print(f"[WARNING] No images found for {person_folder}")
                 continue
 
-            img_path = os.path.join(full_path, images[0])
-            person = Absent(person_id, first_name, last_name, img_path)
-            person.get_emb()  
+            selected_images = images[:5]
+            img_paths = [os.path.join(full_path, img) for img in selected_images]
+
+            person = Absent(person_id, first_name, last_name, img_paths)
             self.people.append(person)
 
         print(f"[INFO] Built database with {len(self.people)} people.")
@@ -37,7 +39,7 @@ class FaceDatabase:
     def add_person(self, person_id, first_name, last_name, img_path, age=None):
         """Add a single person manually"""
         person = Absent(person_id, first_name, last_name, img_path, age)
-        person.get_emb()
+        person.get_embs()
         self.people.append(person)
         print(f"[INFO] Added person: {first_name} {last_name} (ID={person_id})")
 
@@ -49,27 +51,27 @@ class FaceDatabase:
         print(f"[INFO] Uploaded {len(self.people)} people to Firestore.")
 
     def load_from_firestore(self, firestore_client):
-        """Load all people from Firestore"""
-        docs = firestore_client.collection("Users").stream()
+        """Load all people from Firestore and rebuild FaceDatabase"""
         self.people = []
-        for doc in docs:
+        users_ref = firestore_client.collection("Users").stream()
+
+        for doc in users_ref:
             data = doc.to_dict()
-            if not data.get("embedding"):
-                continue
-            person = Absent(
-                id=data.get("id"),
-                first_name=data.get("first_name"),
-                last_name=data.get("last_name"),
-                age=data.get("age"),
-                embedding=data.get("embedding")  
-            )
+            person_id = data["id"]
+            first_name = data.get("first_name", "Unknown")
+            last_name = data.get("last_name", "Unknown")
+            age = data.get("age")
+
+            embeddings_data = data.get("embeddings", [])
+            embeddings = []
+            for emb_obj in embeddings_data:
+                vector = emb_obj.get("vector")
+                if vector:
+                    embeddings.append(np.array(vector))
+
+            person = Absent(person_id, first_name, last_name, img_paths=[], age=age)
+            person._embeddings = embeddings
+
             self.people.append(person)
+
         print(f"[INFO] Loaded {len(self.people)} people from Firestore.")
-
-    def print_list(self):
-        str = ""
-        for p in self.people:
-            str += p.to_string()
-            str += '\n'
-        print(str)
-
