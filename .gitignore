@@ -1,5 +1,14 @@
 # media & data files
-
+*.mp4
+*.MP4
+*.jpg
+*.JPG
+*.jpeg
+*.JPEG
+*.png
+*.PNG
+*.csv
+*.CSV
 configs/accountKey.json
 matches
 face_database
