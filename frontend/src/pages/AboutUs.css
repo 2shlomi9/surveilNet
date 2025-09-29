@@ -1,0 +1,82 @@
+.about-page {
+  position: relative;
+  min-height: 100vh;
+  color: #fff;
+  overflow-x: hidden;
+  font-family: system-ui, Arial, sans-serif;
+}
+
+.about-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+  filter: brightness(0.55);
+  pointer-events: none;
+}
+
+/* Top mini-nav */
+.about-nav {
+  position: sticky;
+  top: 0;
+  padding: 14px 22px;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(6px);
+  z-index: 2;
+}
+.about-home {
+  color: #cfe2ff;
+  text-decoration: none;
+  font-weight: 600;
+}
+.about-home:hover { text-decoration: underline; }
+
+/* Header */
+.about-hero {
+  text-align: center;
+  padding: 56px 20px 22px;
+}
+.about-hero h1 {
+  font-size: clamp(26px, 4vw, 44px);
+  margin: 0 0 10px;
+  font-weight: 800;
+}
+.about-hero p {
+  margin: 0 auto;
+  max-width: 820px;
+  color: #e3ebff;
+  font-size: clamp(15px, 1.5vw, 18px);
+}
+
+/* Feature grid */
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+  max-width: 1100px;
+  margin: 28px auto 64px;
+  padding: 0 20px;
+}
+
+.about-card {
+  background: rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 20px 18px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+  transition: transform .2s ease, background .2s ease;
+}
+.about-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255,255,255,0.12);
+}
+.about-card h3 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+.about-card p {
+  margin: 0;
+  color: #d6d6e6;
+  line-height: 1.5;
+}

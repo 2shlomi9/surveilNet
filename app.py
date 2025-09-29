@@ -102,6 +102,23 @@ def get_videos():
     videos = [f for f in os.listdir(VIDEO_FOLDER) if allowed_file(f) and f.endswith('.mp4')]
     return jsonify({'videos': videos})
 
+@app.route('/api/upload_video', methods=['POST'])
+def upload_video():
+    try:
+        if 'video' not in request.files:
+            return jsonify({'error': 'No video file provided'}), 400
+
+        video = request.files['video']
+        if video and allowed_file(video.filename):
+            filename = secure_filename(video.filename)
+            save_path = os.path.join(VIDEO_FOLDER, filename)
+            video.save(save_path)
+            return jsonify({'message': f'Video {filename} uploaded successfully', 'filename': filename}), 201
+        else:
+            return jsonify({'error': 'Invalid video file'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/matches', methods=['GET'])
 def get_matches():
     matches = [f for f in os.listdir(MATCHES_FOLDER) if allowed_file(f) and f.endswith(('.jpg', '.png'))]
@@ -142,4 +159,3 @@ if __name__ == '__main__':
         print(f"[INFO] Built and uploaded {len(face_db.people)} people from local folder.")
 
     app.run(debug=True, host='127.0.0.1', port=5000)
-
