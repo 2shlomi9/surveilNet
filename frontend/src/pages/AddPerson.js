@@ -1,67 +1,13 @@
-// import { useState } from "react";
-// import { Link } from "react-router-dom";
-
-// function AddPerson() {
-//   const [firstName, setFirstName] = useState("");
-//   const [lastName, setLastName] = useState("");
-//   const [age, setAge] = useState("");
-//   const [images, setImages] = useState([]);
-
-//   const handleSubmit = (e) => {
-//     e.preventDefault();
-//     console.log({ firstName, lastName, age, images });
-//     alert("Person info saved (placeholder, no backend yet).");
-//   };
-
-//   return (
-//     <div className="main-page">
-//       <div className="card">
-//         <h2>➕ Add Person</h2>
-//         <form onSubmit={handleSubmit}>
-//           <input
-//             type="text"
-//             placeholder="First Name"
-//             value={firstName}
-//             onChange={(e) => setFirstName(e.target.value)}
-//             required
-//           />
-//           <input
-//             type="text"
-//             placeholder="Last Name"
-//             value={lastName}
-//             onChange={(e) => setLastName(e.target.value)}
-//             required
-//           />
-//           <input
-//             type="number"
-//             placeholder="Age (optional)"
-//             value={age}
-//             onChange={(e) => setAge(e.target.value)}
-//           />
-//           <input
-//             type="file"
-//             multiple
-//             accept="image/*"
-//             onChange={(e) => setImages([...e.target.files])}
-//           />
-//           <button type="submit" className="btn">Save Person</button>
-//         </form>
-//         <Link to="/"><button className="btn secondary">⬅ Back</button></Link>
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default AddPerson;
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import "./AddPerson.css"; // Import the new CSS file
 
 function AddPerson() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [age, setAge] = useState("");
   const [images, setImages] = useState([]);
-  const [message, setMessage] = useState(""); // For success/error messages
+  const [message, setMessage] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -130,7 +76,7 @@ function AddPerson() {
           />
           <button type="submit" className="btn">Save Person</button>
         </form>
-        {message && <p>{message}</p>} {/* Display success/error message */}
+        {message && <p>{message}</p>}
         <Link to="/">
           <button className="btn secondary">⬅ Back</button>
         </Link>

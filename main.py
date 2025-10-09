@@ -14,7 +14,7 @@ db = firestore.client()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # --- Choose mode ---
-USE_FIRESTORE = True   # True → load from Firestore, False → build locally and upload
+USE_FIRESTORE = False   # True → load from Firestore, False → build locally and upload
 
 face_db = FaceDatabase()
 

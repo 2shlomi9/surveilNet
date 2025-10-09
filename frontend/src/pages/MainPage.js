@@ -25,6 +25,7 @@ export default function MainPage() {
           <div className="hero-buttons">
             <Link to="/add-person" className="btn">➕ Add Person</Link>
             <Link to="/upload-video" className="btn">🎥 Upload Video</Link>
+            <Link to="/matches" className="btn">👁️ View Matches</Link>
           </div>
 
           <div className="hero-more">

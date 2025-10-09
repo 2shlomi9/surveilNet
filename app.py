@@ -145,6 +145,32 @@ def process_video():
 def serve_match(filename):
     return send_from_directory(MATCHES_FOLDER, filename)
 
+@app.route('/api/matches/<filename>', methods=['DELETE'])
+def delete_match(filename):
+    try:
+        file_path = os.path.join(MATCHES_FOLDER, filename)
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+        os.remove(file_path)
+        return jsonify({'message': f'File {filename} deleted successfully'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/matches', methods=['DELETE'])
+def delete_all_matches():
+    try:
+        deleted_files = []
+        for filename in os.listdir(MATCHES_FOLDER):
+            if allowed_file(filename) and filename.endswith(('.jpg', '.png')):
+                file_path = os.path.join(MATCHES_FOLDER, filename)
+                os.remove(file_path)
+                deleted_files.append(filename)
+        if not deleted_files:
+            return jsonify({'message': 'No matches found to delete'}), 200
+        return jsonify({'message': f'Deleted {len(deleted_files)} match files', 'deleted_files': deleted_files}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ---------------------- MAIN ----------------------
 if __name__ == '__main__':
     # Load database

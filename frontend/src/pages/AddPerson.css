@@ -1,0 +1,53 @@
+.card {
+  background: rgba(0, 0, 0, 0.55);
+  padding: 28px 28px 32px;
+  border-radius: 16px;
+  max-width: 900px;
+  width: min(92vw, 900px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.btn {
+  background: #1877f2;
+  border-radius: 10px;
+  padding: 12px 22px;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  transition: background .2s ease, transform .05s ease;
+}
+
+.btn:hover {
+  background: #0f5bd1;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.secondary {
+  background: #6c757d;
+}
+
+.secondary:hover {
+  background: #5a6268;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+input {
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 16px;
+}
+
+input::placeholder {
+  color: #dbe6ff;
+}

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -70,7 +69,16 @@ function UploadVideo() {
             {processing ? "Processing..." : "Process Video"}
           </button>
         </form>
-        {message && <p>{message}</p>} {/* Display success/error message */}
+        {message && (
+          <div>
+            <p>{message}</p>
+            {message.includes("Success") && (
+              <Link to="/matches">
+                <button className="btn">👁️ View Matches</button>
+              </Link>
+            )}
+          </div>
+        )}
         <Link to="/">
           <button className="btn secondary">⬅ Back</button>
         </Link>
