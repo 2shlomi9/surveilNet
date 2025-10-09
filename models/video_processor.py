@@ -1,3 +1,4 @@
+import cv2
 from PIL import Image
 from retinaface import RetinaFace
 import numpy as np
