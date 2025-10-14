@@ -1,53 +1,109 @@
-import os
-import torch
-import numpy as np
-from PIL import Image
-from facenet_pytorch import MTCNN, InceptionResnetV1
+# models/absent.py
+# Simple person model used by FaceDatabase and the API.
+# Goals:
+#  - Always define .embeddings (list[np.ndarray]) and .mean_embedding (np.ndarray or None)
+#  - Keep serialization (to_dict) free of raw numpy arrays
+#  - Be minimal and framework-agnostic
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-mtcnn = MTCNN(image_size=160, margin=0, device=device)
-model = InceptionResnetV1(pretrained="vggface2").eval().to(device)
+from __future__ import annotations
+
+from typing import List, Optional, Any, Dict
+import numpy as np
 
 
 class Absent:
-    def __init__(self, id, first_name, last_name, img_paths, age=None, main_img_path=None):
-        self.id = id
-        self.first_name = first_name
-        self.last_name = last_name
-        self.img_paths = img_paths if isinstance(img_paths, list) else [img_paths]
-        self.main_img_path = main_img_path or (self.img_paths[0] if self.img_paths else None)
-        self.age = age
-        self._embeddings = None
+    """
+    Represents a person in memory.
 
-    def get_embs(self):
-        """Compute embeddings for all images and cache them."""
-        if self._embeddings is not None:
-            return self._embeddings
+    Fields:
+      - id: unique string identifier (UUID or external)
+      - first_name, last_name: basic identity fields
+      - age: optional string / number (kept as string in most APIs)
+      - images: list of local image paths used to compute embeddings
+      - main_img_path: canonical image (local path or remote URL if uploaded)
+      - embeddings: list of np.ndarray (512,) computed from 'images'
+      - mean_embedding: single np.ndarray (512,) averaged over 'embeddings', or None
+    """
 
-        embs = []
-        for img_path in self.img_paths:
-            if not os.path.exists(img_path):
-                continue
-            try:
-                img = Image.open(img_path).convert("RGB")
-                face = mtcnn(img)
-                if face is None:
-                    continue
-                emb = model(face.unsqueeze(0).to(device)).detach().cpu().numpy()[0]
-                embs.append(emb)
-            except Exception as e:
-                print(f"[ERROR] Failed to process image {img_path}: {e}")
+    def __init__(
+        self,
+        person_id: str,
+        first_name: str,
+        last_name: str,
+        age: Optional[str] = None,
+    ) -> None:
+        self.id: str = person_id
+        self.first_name: str = first_name
+        self.last_name: str = last_name
+        self.age: Optional[str] = age
 
-        self._embeddings = embs
-        return embs
+        # Local image paths used to build embeddings
+        self.images: List[str] = []
 
-    def to_dict(self):
-        """Convert person data to Firestore-friendly dict."""
+        # May be a local path OR a remote URL (e.g., Cloudinary)
+        self.main_img_path: Optional[str] = None
+
+        # Always defined:
+        self.embeddings: List[np.ndarray] = []   # list of 512-d vectors
+        self.mean_embedding: Optional[np.ndarray] = None  # single 512-d vector or None
+
+    # ---------------------------- Helpers ---------------------------- #
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
+
+    def has_embeddings(self) -> bool:
+        return bool(self.embeddings) or (self.mean_embedding is not None)
+
+    def set_embeddings(self, vectors: List[np.ndarray]) -> None:
+        """
+        Replace the current embeddings list with 'vectors' (each np.ndarray (512,)).
+        Also updates mean_embedding accordingly.
+        """
+        self.embeddings = [np.asarray(v, dtype=np.float32) for v in (vectors or [])]
+        if self.embeddings:
+            self.mean_embedding = np.mean(np.stack(self.embeddings, axis=0), axis=0).astype(np.float32)
+        else:
+            self.mean_embedding = None
+
+    # ---------------------------- Serialization ---------------------------- #
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Safe dict for Firestore or JSON (no raw numpy arrays inside).
+        Note:
+          - We do NOT return 'embeddings' (list of vectors) here to avoid large payloads
+            and Firestore nested-array limitations.
+          - If you want to store the embedding, store ONLY 'mean_embedding' as a flat list.
+            FaceDatabase handles this when uploading.
+        """
         return {
             "id": self.id,
             "first_name": self.first_name,
             "last_name": self.last_name,
             "age": self.age,
             "main_img_path": self.main_img_path,
-            "embeddings": [{"vector": emb.tolist()} for emb in (self._embeddings or [])],
+            # 'embedding' (flat list) is handled by FaceDatabase.upload_person_to_firestore
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Absent":
+        """
+        Build an Absent from a dict (e.g., Firestore doc). This does NOT hydrate numpy arrays.
+        The FaceDatabase.load_from_firestore will populate embeddings/mean_embedding correctly.
+        """
+        person = cls(
+            person_id=data.get("id") or "",
+            first_name=data.get("first_name") or "",
+            last_name=data.get("last_name") or "",
+            age=data.get("age"),
+        )
+        person.main_img_path = data.get("main_img_path")
+        # embeddings / mean_embedding are set by the loader (FaceDatabase.load_from_firestore)
+        return person
+
+    def __repr__(self) -> str:
+        emb_count = len(self.embeddings) if self.embeddings is not None else 0
+        has_mean = self.mean_embedding is not None
+        return f"Absent(id={self.id!r}, name={self.full_name!r}, emb_count={emb_count}, mean={has_mean})"

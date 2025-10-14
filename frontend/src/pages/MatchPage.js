@@ -1,184 +1,113 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import "./MatchPage.css";
 
+/**
+ * MatchPage
+ * - Displays all saved matches (from /api/matches_feed) in a clean two-column layout.
+ * - Left: reference image (person_main_image) + person name
+ * - Right: matched frame from video + details (score, place, time, video, frame)
+ */
 function MatchPage() {
-  const [matches, setMatches] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    const fetchMatches = async () => {
+    const load = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/matches");
-        if (!response.ok) {
-          throw new Error("Failed to fetch matches");
+        const res = await fetch("http://localhost:5000/api/matches_feed");
+        const data = await res.json();
+        if (!res.ok) {
+          setMsg(data.error || "Failed to load matches");
+          return;
         }
-        const data = await response.json();
-        console.log("[DEBUG] Matches received from /api/matches:", data.matches);
-        setMatches(data.matches || []);
+        setItems(data.matches || []);
       } catch (err) {
-        setError(err.message);
+        setMsg(String(err.message || err));
       } finally {
         setLoading(false);
       }
     };
-
-    fetchMatches();
+    load();
   }, []);
-
-  const parseMatchInfo = (filename) => {
-    const parts = filename.replace('.jpg', '').split('_');
-    if (parts.length < 4) return null;
-    const isReference = parts[0] === 'reference';
-    const frameNum = isReference ? null : parts[0].replace('frame', '');
-    const personId = parts[1].replace('id', '');
-    const firstName = parts[2];
-    const lastName = parts[3];
-    return { frameNum, personId, firstName, lastName, filename, isReference };
-  };
-
-  const handleDownload = async (filename) => {
-    try {
-      const response = await fetch(`http://localhost:5000/matches/${filename}`);
-      if (!response.ok) throw new Error("Download failed");
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      alert(`Download error: ${err.message}`);
-    }
-  };
-
-  const handleDelete = async (filename, personId) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/matches/${filename}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to delete match");
-      setMatches((prevMatches) => {
-        const newMatches = prevMatches.filter((match) => match !== filename);
-        console.log("[DEBUG] Updated matches after delete:", newMatches);
-        return newMatches;
-      });
-      alert(`Match ${filename} deleted successfully`);
-    } catch (err) {
-      alert(`Delete error: ${err.message}`);
-    }
-  };
-
-  const handleDeleteAll = async () => {
-    if (!window.confirm("Are you sure you want to delete all matches?")) {
-      return;
-    }
-    try {
-      const response = await fetch("http://localhost:5000/api/matches", {
-        method: "DELETE",
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to delete all matches");
-      setMatches([]);
-      alert(data.message || "All matches deleted successfully");
-    } catch (err) {
-      alert(`Delete all error: ${err.message}`);
-    }
-  };
-
-  if (loading) return <div className="main-page"><div className="card"><p>Loading matches...</p></div></div>;
-  if (error) return <div className="main-page"><div className="card"><p>Error: {error}</p></div></div>;
-
-  const parsedMatches = matches.map(parseMatchInfo).filter(Boolean);
-  console.log("[DEBUG] Parsed matches:", parsedMatches);
-  const matchGroups = {};
-  parsedMatches.forEach((match) => {
-    if (!match.isReference) {
-      const key = match.personId;
-      if (!matchGroups[key]) {
-        matchGroups[key] = { match: null, reference: null };
-      }
-      matchGroups[key].match = match;
-    } else {
-      const key = match.personId;
-      if (!matchGroups[key]) {
-        matchGroups[key] = { match: null, reference: null };
-      }
-      matchGroups[key].reference = match;
-    }
-  });
-  console.log("[DEBUG] Match groups:", matchGroups);
 
   return (
     <div className="main-page">
-      <div className="card">
-        <h2>👁️ Found Matches</h2>
-        {Object.keys(matchGroups).length === 0 ? (
-          <p>No matches found yet. Upload a video and process it!</p>
-        ) : (
-          <div className="match-container">
-            <button
-              onClick={handleDeleteAll}
-              className="btn delete-btn"
-              style={{ marginBottom: "1rem" }}
-            >
-              🗑️ Delete All Matches
-            </button>
-            <div className="match-grid">
-              {Object.values(matchGroups).map((group) => (
-                group.match && (
-                  <div key={group.match.personId} className="match-card">
-                    <div className="image-pair">
-                      <div className="image-container">
-                        <h4>Match Image</h4>
-                        <img
-                          src={`http://localhost:5000/matches/${group.match.filename}`}
-                          alt={`${group.match.firstName} ${group.match.lastName} - Frame ${group.match.frameNum}`}
-                          className="match-photo"
-                        />
-                      </div>
-                      <div className="image-container">
-                        <h4>Reference Image</h4>
-                        {group.reference ? (
-                          <img
-                            src={`http://localhost:5000/matches/${group.reference.filename}`}
-                            alt={`${group.match.firstName} ${group.match.lastName} - Reference`}
-                            className="match-photo"
-                          />
-                        ) : (
-                          <p>No reference image available</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="match-info">
-                      <h3>{group.match.firstName} {group.match.lastName}</h3>
-                      <p>ID: {group.match.personId}</p>
-                      <p>Frame: {group.match.frameNum}</p>
-                    </div>
-                    <button onClick={() => handleDownload(group.match.filename)} className="btn">⬇ Download Match</button>
-                    {group.reference && (
-                      <button onClick={() => handleDownload(group.reference.filename)} className="btn secondary">⬇ Download Reference</button>
+      <div className="card" style={{ maxWidth: 1100 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h2>🔎 Matches</h2>
+          <Link to="/"><button className="btn secondary">⬅ Back</button></Link>
+        </div>
+
+        {loading && <p>Loading…</p>}
+        {msg && <p style={{ color: "salmon" }}>{msg}</p>}
+
+        {!loading && items.length === 0 && <p>No matches yet.</p>}
+
+        <div className="matches-grid">
+          {items.map((m) => {
+            // frame image URL (prefer frame_url; if missing, fallback to api)
+            const frameUrl = m.frame_url
+              ? `http://localhost:5000${m.frame_url}`
+              : m.frame_image
+                ? `http://localhost:5000/api/frame_image?path=${encodeURIComponent(m.frame_image)}`
+                : null;
+
+            const personImg = m.person_main_image || null;
+
+            const ts = m.ts ? new Date(m.ts * 1000).toLocaleString() : "";
+            const timeStr = m.time || "";
+
+            return (
+              <div className="match-card" key={m.id}>
+                {/* Left column: uploaded / reference image */}
+                <div className="col">
+                  <div className="img-wrap">
+                    {personImg ? (
+                      <img src={personImg} alt={m.person_name || "reference"} />
+                    ) : (
+                      <div className="img-placeholder">No reference image</div>
                     )}
-                    <button
-                      onClick={() => handleDelete(group.match.filename, group.match.personId)}
-                      className="btn delete-btn"
-                    >
-                      🗑️ Delete Match
-                    </button>
                   </div>
-                )
-              ))}
-            </div>
-          </div>
-        )}
-        <Link to="/">
-          <button className="btn secondary">⬅ Back to Home</button>
-        </Link>
+                  <div className="meta">
+                    <div className="title">{m.person_name || "Unknown person"}</div>
+                    <div className="sub">Saved: {ts || "-"}</div>
+                  </div>
+                </div>
+
+                {/* Right column: matched video frame */}
+                <div className="col">
+                  <div className="img-wrap">
+                    {frameUrl ? (
+                      <img src={frameUrl} alt="matched frame" />
+                    ) : (
+                      <div className="img-placeholder">Frame unavailable</div>
+                    )}
+                  </div>
+                  <div className="meta">
+                    <div className="title">Best frame</div>
+                    <div className="kv">
+                      <span>Score</span><span>{(m.score ?? "").toFixed ? m.score.toFixed(3) : m.score}</span>
+                    </div>
+                    <div className="kv">
+                      <span>Place</span><span>{m.place || "-"}</span>
+                    </div>
+                    <div className="kv">
+                      <span>Time</span><span>{timeStr || "-"}</span>
+                    </div>
+                    <div className="kv">
+                      <span>Video</span><span>{m.video || "-"}</span>
+                    </div>
+                    <div className="kv">
+                      <span>Frame</span><span>{m.frame_idx ?? "-"}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
       </div>
     </div>
   );
