@@ -6,7 +6,7 @@
 #               appends ALL matches to a feed (for MatchPage), returns best to caller.
 # - Static serving of frame_store files for <img src> usage in the UI.
 
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, make_response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import signal, sys, threading
@@ -17,6 +17,7 @@ import uuid
 import json
 import time
 import torch
+import threading
 
 # Project models
 from models.face_database import FaceDatabase
@@ -31,9 +32,37 @@ from firebase_admin import credentials, firestore
 # ----------------------------- App & Config ----------------------------- #
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000"])
+CORS(
+    app,
+    resources={r"/*": {"origins": ["http://localhost:3000"]}},
+    methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type"],
+    supports_credentials=False,
+)
+
+@app.after_request
+def add_cors_headers(resp):
+    resp.headers["Access-Control-Allow-Origin"] = "http://localhost:3000"
+    resp.headers["Access-Control-Allow-Methods"] = "GET,POST,DELETE,OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return resp
+
+# להחזיר 200 לכל preflight (OPTIONS) לכל נתיב
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        resp = make_response("", 200)
+        resp.headers["Access-Control-Allow-Origin"] = "http://localhost:3000"
+        resp.headers["Access-Control-Allow-Methods"] = "GET,POST,DELETE,OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = request.headers.get(
+            "Access-Control-Request-Headers", "Content-Type"
+        )
+        return resp
 
 STOP_EVENT = threading.Event()
+
+PROCESS_JOBS = {}  # job_id -> {"current": int, "total": int, "done": bool, "filename": str}
+PROCESS_LOCK = threading.Lock()
 
 # Folders
 UPLOAD_FOLDER = "uploads"
@@ -80,8 +109,45 @@ def _handle_sigint(signum, frame):
     # Hard-exit prevents hanging threads; use 130 (SIGINT)
     os._exit(130)
 
+
 signal.signal(signal.SIGINT, _handle_sigint)
 
+def make_progress_cb(job_id: str):
+    def _cb(cur: int, total: int):
+        with PROCESS_LOCK:
+            job = PROCESS_JOBS.get(job_id)
+            if job:
+                job["current"] = int(cur) + 1
+                job["total"] = max(int(total), 1)
+                job["done"] = (job["current"] >= job["total"])
+    return _cb
+
+def _run_processing_job(job_id: str, filename: str, video_meta: dict):
+    try:
+        matcher = FaceMatcher(face_db)  # not used in store_only
+        processor = VideoProcessor(
+            matcher=matcher,
+            output_folder=MATCHES_FOLDER,
+            frame_skip=5,
+            store_only=True,
+            video_meta=video_meta,
+            frame_store_root=FRAME_STORE_ROOT,
+            device=device,
+            stop_event=STOP_EVENT,
+            progress_cb=make_progress_cb(job_id),
+        )
+        video_path = os.path.join(VIDEO_FOLDER, filename)
+        processor.process_video(video_path)
+    except Exception as e:
+        print(f"[ERROR] job {job_id} failed: {e}")
+    finally:
+        with PROCESS_LOCK:
+            job = PROCESS_JOBS.get(job_id)
+            if job:
+                total = max(job.get("total", 1), 1)
+                job["current"] = total
+                job["total"] = total
+                job["done"] = True
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -399,7 +465,8 @@ def process_video():
 @app.route("/api/matches_feed", methods=["GET"])
 def get_matches_feed():
     """
-    Return the saved matches feed as a list (newest first).
+    Return saved matches as a list (newest first).
+    If best_per_person=1, return only the top-scoring match per person.
     """
     items = []
     if MATCHES_FEED_PATH.exists():
@@ -409,9 +476,57 @@ def get_matches_feed():
                     items.append(json.loads(line))
                 except Exception:
                     continue
+
+    # newest first
     items.sort(key=lambda x: x.get("ts", 0), reverse=True)
+
+    best_only = str(request.args.get("best_per_person", "0")).lower() in ("1", "true", "yes")
+    if best_only and items:
+        best_by_person = {}
+        for m in items:
+            pid = m.get("person_id") or "__unknown__"
+            cur = best_by_person.get(pid)
+            if cur is None:
+                best_by_person[pid] = m
+            else:
+                # prefer higher score; if tie, prefer newer (higher ts)
+                if (m.get("score", 0) > cur.get("score", 0)) or (
+                    m.get("score", 0) == cur.get("score", 0) and m.get("ts", 0) > cur.get("ts", 0)
+                ):
+                    best_by_person[pid] = m
+        items = list(best_by_person.values())
+        # keep consistent order: newest first
+        items.sort(key=lambda x: x.get("ts", 0), reverse=True)
+
     return jsonify({"matches": items}), 200
 
+@app.route("/api/matches_feed/<match_id>", methods=["DELETE", "OPTIONS"])
+def delete_match_from_feed(match_id):
+    if request.method == "OPTIONS":
+        return ("", 200)  # preflight OK
+
+    if not MATCHES_FEED_PATH.exists():
+        return jsonify({"error": "Feed file not found"}), 404
+
+    kept, removed = [], 0
+    with open(MATCHES_FEED_PATH, "r", encoding="utf-8") as fp:
+        for line in fp:
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            if obj.get("id") == match_id:
+                removed += 1
+            else:
+                kept.append(obj)
+
+    with open(MATCHES_FEED_PATH, "w", encoding="utf-8") as fp:
+        for obj in kept:
+            fp.write(json.dumps(obj, ensure_ascii=False) + "\n")
+
+    if removed == 0:
+        return jsonify({"error": "Match not found"}), 404
+    return jsonify({"message": f"Deleted {removed} match item", "deleted": removed}), 200
 
 # ----------------------------- Static serving for frame_store ----------------------------- #
 
@@ -505,6 +620,59 @@ def delete_all_matches():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/process_video_async", methods=["POST"])
+def process_video_async():
+    data = request.get_json()
+    if not data or "filename" not in data:
+        return jsonify({"error": "Filename is required in JSON body"}), 400
+
+    filename = secure_filename(data["filename"])
+    video_path = os.path.join(VIDEO_FOLDER, filename)
+    if not os.path.exists(video_path):
+        return jsonify({"error": f"Video file not found: {filename}"}), 404
+
+    # load optional meta (saved at upload)
+    meta_path = os.path.join(VIDEO_FOLDER, f"{filename}.json")
+    video_meta = {}
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                video_meta = json.load(f)
+        except Exception:
+            video_meta = {}
+
+    job_id = str(uuid.uuid4())
+    with PROCESS_LOCK:
+        PROCESS_JOBS[job_id] = {"current": 0, "total": 1, "done": False, "filename": filename}
+
+    t = threading.Thread(target=_run_processing_job, args=(job_id, filename, video_meta), daemon=True)
+    t.start()
+
+    return jsonify({"job_id": job_id}), 202
+
+
+@app.route("/api/process_status", methods=["GET"])
+def process_status():
+    job_id = request.args.get("job_id", "")
+    if not job_id:
+        return jsonify({"error": "job_id is required"}), 400
+
+    with PROCESS_LOCK:
+        job = PROCESS_JOBS.get(job_id)
+        if not job:
+            return jsonify({"error": "job not found"}), 404
+        cur = int(job.get("current", 0))
+        total = max(int(job.get("total", 1)), 1)
+        done = bool(job.get("done", False))
+        percent = int(round(min(cur, total) * 100 / total))
+
+    return jsonify({
+        "filename": job.get("filename"),
+        "current": cur,
+        "total": total,
+        "percent": percent,
+        "done": done
+    }), 200
 
 # ----------------------------- Main ----------------------------- #
 

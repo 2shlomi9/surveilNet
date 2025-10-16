@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import json
 from typing import List, Dict, Optional
 
@@ -50,24 +51,32 @@ def _parse_iso(iso_str: Optional[str]) -> Optional[datetime]:
         return None
 
 
+def _render_progress(cur: int, total: int, prefix: str = "[PROCESS]") -> None:
+    total = max(int(total or 0), 1)
+    cur_disp = min(cur + 1, total)
+    ratio = cur_disp / total
+    width = 30
+    filled = int(width * ratio)
+    bar = "█" * filled + "-" * (width - filled)
+    percent = int(round(ratio * 100))
+    sys.stdout.write(f"\r{prefix} frame {cur_disp}/{total} |{bar}| {percent:3d}%")
+    sys.stdout.flush()
+
 # ----------------------------- main class ----------------------------- #
 
-class VideoProcessor:
-    """
-    Process a video, detect faces, compute embeddings, and STORE them with thumbnails + metadata.
-    This class does NOT perform person matching during processing.
-    """
 
+class VideoProcessor:
     def __init__(
         self,
-        matcher,  # kept for API compatibility (not used when store_only=True)
+        matcher,
         output_folder: str,
         frame_skip: int = 5,
         store_only: bool = True,
         video_meta: Optional[Dict] = None,
         frame_store_root: str = "frame_store",
         device: Optional[torch.device] = None,
-        stop_event = None
+        stop_event=None,
+        progress_cb=None,  # <-- NEW: callable(frame_idx:int, total:int)
     ):
         self.matcher = matcher
         self.output_folder = output_folder
@@ -75,26 +84,24 @@ class VideoProcessor:
         self.store_only = store_only
         self.video_meta = video_meta or {}
         self.frame_store_root = frame_store_root
+        self.stop_event = stop_event
+        self.progress_cb = progress_cb
 
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.stop_event = stop_event
-        # Face alignment + embedding
         self.mtcnn = MTCNN(image_size=160, margin=20, post_process=True, device=self.device)
         self.resnet = InceptionResnetV1(pretrained="vggface2").eval().to(self.device)
-
     # ----------------------------- pipeline ----------------------------- #
 
     def process_video(self, video_path: str) -> Dict:
-        """
-        Read frames, detect faces, compute embeddings, and store them (store_only mode).
-        Returns stats dict.
-        """
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
+            print(f"[ERROR] Failed to open video: {video_path}")
             return {"frames_total": 0, "stored_faces": 0, "fps": 0.0}
 
         fps = float(cap.get(cv2.CAP_PROP_FPS) or 25.0)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        if total_frames <= 0:
+            total_frames = 1
 
         video_name = os.path.basename(video_path)
         base_store = os.path.join(self.frame_store_root, os.path.splitext(video_name)[0])
@@ -116,45 +123,55 @@ class VideoProcessor:
         try:
             while True:
                 if self.stop_event and self.stop_event.is_set():
+                    print("\n[INFO] Processing interrupted (stop_event set).")
                     break
+
                 ok, frame = cap.read()
                 if not ok:
+                    _render_progress(total_frames - 1, total_frames)
+                    if self.progress_cb:
+                        self.progress_cb(total_frames - 1, total_frames)
                     break
+
+                # Print to terminal + fire progress callback (per frame)
+                _render_progress(frame_idx, total_frames)
+                if self.progress_cb:
+                    self.progress_cb(frame_idx, total_frames)
 
                 if frame_idx % self.frame_skip != 0:
                     frame_idx += 1
                     continue
 
-                if self.stop_event and self.stop_event.is_set():
-                    break
-
-                boxes = self.detect_faces(frame)  # list of [x1,y1,x2,y2]
+                boxes = self.detect_faces(frame)
                 for box in boxes:
                     if self.stop_event and self.stop_event.is_set():
+                        print("\n[INFO] Processing interrupted inside boxes loop.")
                         break
-                    face_img = self.crop_face(frame, box)  # BGR
+
+                    face_img = self.crop_face(frame, box)
                     if face_img is None or face_img.size == 0:
                         continue
 
-                    emb = self.get_embedding_from_image(face_img)  # np.ndarray (512,)
+                    emb = self.get_embedding_from_image(face_img)
                     if emb is None:
                         continue
 
-                    # save embedding (npy)
                     emb_path = os.path.join(embeds_dir, f"{frame_idx}.npy")
                     np.save(emb_path, emb.astype(np.float32))
 
-                    # save thumbnail (jpg)
                     thumb_path = os.path.join(thumbs_dir, f"{frame_idx}.jpg")
                     cv2.imwrite(thumb_path, face_img)
 
-                    # compute absolute time for frame (if start_time provided)
                     time_iso = None
                     if start_dt:
                         dt = start_dt + timedelta(seconds=float(frame_idx) / max(1.0, fps))
-                        time_iso = dt.astimezone(timezone.utc).replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
+                        time_iso = (
+                            dt.astimezone(timezone.utc)
+                            .replace(tzinfo=timezone.utc)
+                            .isoformat()
+                            .replace("+00:00", "Z")
+                        )
 
-                    # write metadata row
                     rec = {
                         "video": video_name,
                         "frame_idx": frame_idx,
@@ -173,11 +190,14 @@ class VideoProcessor:
         finally:
             cap.release()
             meta_fp.close()
+            _render_progress(total_frames - 1, total_frames)
+            sys.stdout.write("\n")
+            sys.stdout.flush()
 
         return {
-            "frames_total": total_frames,
-            "stored_faces": stored_faces,
-            "fps": fps,
+            "frames_total": int(total_frames),
+            "stored_faces": int(stored_faces),
+            "fps": float(fps),
             "store_dir": base_store,
         }
 
@@ -241,7 +261,6 @@ def search_best_match_for_person(person, base_folder: str = "frame_store") -> Op
     Prefers person's mean_embedding if available; otherwise uses max over person's embeddings.
     Adds 'frame_url' for direct <img src> (served by Flask route /frame_store/<...>).
     """
-    # Guards
     has_mean = getattr(person, "mean_embedding", None) is not None
     has_list = bool(getattr(person, "embeddings", None))
     if not person or (not has_mean and not has_list):
@@ -298,8 +317,8 @@ def search_best_match_for_person(person, base_folder: str = "frame_store") -> Op
                         frame_img_path = os.path.join(path, frame_img_path)
                     best = {
                         "score": score,
-                        "frame_image": frame_img_path,                 # absolute path (debug)
-                        "frame_url": _to_frame_url(frame_img_path),    # browser-friendly URL
+                        "frame_image": frame_img_path,
+                        "frame_url": _to_frame_url(frame_img_path),
                         "place": rec.get("place", "Unknown"),
                         "time_iso": rec.get("time_iso"),
                         "video": rec.get("video"),
@@ -316,7 +335,6 @@ def search_matches_for_person(person, base_folder: str = "frame_store", top_k: i
     """
     results: List[Dict] = []
 
-    # Guards
     has_mean = getattr(person, "mean_embedding", None) is not None
     has_list = bool(getattr(person, "embeddings", None))
     if not person or (not has_mean and not has_list):
@@ -374,8 +392,8 @@ def search_matches_for_person(person, base_folder: str = "frame_store", top_k: i
 
                 results.append({
                     "score": score,
-                    "frame_image": frame_img_path,                 # absolute path (debug)
-                    "frame_url": _to_frame_url(frame_img_path),    # browser-friendly URL
+                    "frame_image": frame_img_path,
+                    "frame_url": _to_frame_url(frame_img_path),
                     "place": rec.get("place", "Unknown"),
                     "time_iso": rec.get("time_iso"),
                     "video": rec.get("video"),
