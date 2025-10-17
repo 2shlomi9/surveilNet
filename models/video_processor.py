@@ -52,31 +52,40 @@ def _parse_iso(iso_str: Optional[str]) -> Optional[datetime]:
 
 
 def _render_progress(cur: int, total: int, prefix: str = "[PROCESS]") -> None:
+    """
+    Render a single-line progress bar to stdout.
+    cur is 0-based frame index; shown to user as 1-based.
+    """
     total = max(int(total or 0), 1)
     cur_disp = min(cur + 1, total)
     ratio = cur_disp / total
-    width = 30
+    width = 30  # bar width in chars
     filled = int(width * ratio)
     bar = "█" * filled + "-" * (width - filled)
     percent = int(round(ratio * 100))
     sys.stdout.write(f"\r{prefix} frame {cur_disp}/{total} |{bar}| {percent:3d}%")
     sys.stdout.flush()
 
+
 # ----------------------------- main class ----------------------------- #
 
-
 class VideoProcessor:
+    """
+    Process a video, detect faces, compute embeddings, and STORE them with thumbnails + metadata.
+    This class does NOT perform person matching during processing.
+    """
+
     def __init__(
         self,
-        matcher,
+        matcher,  # kept for API compatibility (not used when store_only=True)
         output_folder: str,
         frame_skip: int = 5,
         store_only: bool = True,
         video_meta: Optional[Dict] = None,
         frame_store_root: str = "frame_store",
         device: Optional[torch.device] = None,
-        stop_event=None,
-        progress_cb=None,  # <-- NEW: callable(frame_idx:int, total:int)
+        stop_event=None,  # threading.Event (optional)
+        progress_cb=None,  # callable(frame_idx:int, total:int) for UI progress
     ):
         self.matcher = matcher
         self.output_folder = output_folder
@@ -88,11 +97,18 @@ class VideoProcessor:
         self.progress_cb = progress_cb
 
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Face alignment + embedding
         self.mtcnn = MTCNN(image_size=160, margin=20, post_process=True, device=self.device)
         self.resnet = InceptionResnetV1(pretrained="vggface2").eval().to(self.device)
+
     # ----------------------------- pipeline ----------------------------- #
 
     def process_video(self, video_path: str) -> Dict:
+        """
+        Read frames, detect faces, compute embeddings, and store them (store_only mode).
+        Prints current frame and a terminal progress bar updated per frame.
+        Returns stats dict.
+        """
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             print(f"[ERROR] Failed to open video: {video_path}")
@@ -101,7 +117,7 @@ class VideoProcessor:
         fps = float(cap.get(cv2.CAP_PROP_FPS) or 25.0)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         if total_frames <= 0:
-            total_frames = 1
+            total_frames = 1  # avoid div by zero; progress still updates
 
         video_name = os.path.basename(video_path)
         base_store = os.path.join(self.frame_store_root, os.path.splitext(video_name)[0])
@@ -128,12 +144,13 @@ class VideoProcessor:
 
                 ok, frame = cap.read()
                 if not ok:
+                    # finalize progress to 100%
                     _render_progress(total_frames - 1, total_frames)
                     if self.progress_cb:
                         self.progress_cb(total_frames - 1, total_frames)
                     break
 
-                # Print to terminal + fire progress callback (per frame)
+                # Print progress to terminal + fire UI callback
                 _render_progress(frame_idx, total_frames)
                 if self.progress_cb:
                     self.progress_cb(frame_idx, total_frames)
@@ -142,26 +159,29 @@ class VideoProcessor:
                     frame_idx += 1
                     continue
 
-                boxes = self.detect_faces(frame)
+                boxes = self.detect_faces(frame)  # list of [x1,y1,x2,y2]
                 for box in boxes:
                     if self.stop_event and self.stop_event.is_set():
                         print("\n[INFO] Processing interrupted inside boxes loop.")
                         break
 
-                    face_img = self.crop_face(frame, box)
+                    face_img = self.crop_face(frame, box)  # BGR
                     if face_img is None or face_img.size == 0:
                         continue
 
-                    emb = self.get_embedding_from_image(face_img)
+                    emb = self.get_embedding_from_image(face_img)  # np.ndarray (512,)
                     if emb is None:
                         continue
 
+                    # save embedding (npy)
                     emb_path = os.path.join(embeds_dir, f"{frame_idx}.npy")
                     np.save(emb_path, emb.astype(np.float32))
 
+                    # save thumbnail (jpg)
                     thumb_path = os.path.join(thumbs_dir, f"{frame_idx}.jpg")
                     cv2.imwrite(thumb_path, face_img)
 
+                    # compute absolute time for frame (if start_time provided)
                     time_iso = None
                     if start_dt:
                         dt = start_dt + timedelta(seconds=float(frame_idx) / max(1.0, fps))
@@ -172,6 +192,7 @@ class VideoProcessor:
                             .replace("+00:00", "Z")
                         )
 
+                    # write metadata row (INCLUDES fps and box)
                     rec = {
                         "video": video_name,
                         "frame_idx": frame_idx,
@@ -260,6 +281,7 @@ def search_best_match_for_person(person, base_folder: str = "frame_store") -> Op
     Iterate over stored frame embeddings and return the single best match.
     Prefers person's mean_embedding if available; otherwise uses max over person's embeddings.
     Adds 'frame_url' for direct <img src> (served by Flask route /frame_store/<...>).
+    Also returns fps and box.
     """
     has_mean = getattr(person, "mean_embedding", None) is not None
     has_list = bool(getattr(person, "embeddings", None))
@@ -323,15 +345,23 @@ def search_best_match_for_person(person, base_folder: str = "frame_store") -> Op
                         "time_iso": rec.get("time_iso"),
                         "video": rec.get("video"),
                         "frame_idx": rec.get("frame_idx"),
+                        "fps": rec.get("fps"),
+                        "box": rec.get("box"),
                     }
 
     return best
 
 
-def search_matches_for_person(person, base_folder: str = "frame_store", top_k: int = 10, min_score: float = 0.55) -> List[Dict]:
+def search_matches_for_person(
+    person,
+    base_folder: str = "frame_store",
+    top_k: int = 10,
+    min_score: float = 0.55,
+) -> List[Dict]:
     """
     Return a list of matches sorted by score desc (for MatchPage).
-    Each item includes frame_url (served by /frame_store/*). Filters by min_score and trims to top_k.
+    Each item includes frame_url (served by /frame_store/*), and now also fps and box.
+    Filters by min_score and trims to top_k.
     """
     results: List[Dict] = []
 
@@ -398,6 +428,8 @@ def search_matches_for_person(person, base_folder: str = "frame_store", top_k: i
                     "time_iso": rec.get("time_iso"),
                     "video": rec.get("video"),
                     "frame_idx": rec.get("frame_idx"),
+                    "fps": rec.get("fps"),
+                    "box": rec.get("box"),
                 })
 
     results.sort(key=lambda x: x["score"], reverse=True)

@@ -6,12 +6,18 @@ import "./MatchPage.css";
  * MatchPage
  * - Loads only best-per-person matches from /api/matches_feed?best_per_person=1
  * - Displays compact, separated cards in a 3-column responsive grid
- * - Each card shows: reference image, matched frame, details, and a delete button
+ * - Each card shows: reference image, matched frame, details, delete button, and "Watch 10s clip"
  */
 function MatchPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
+
+  // Clip modal
+  const [clipOpen, setClipOpen] = useState(false);
+  const [clipUrl, setClipUrl] = useState("");
+  const [clipLoading, setClipLoading] = useState(false);
+  const [clipErr, setClipErr] = useState("");
 
   const fetchFeed = useCallback(async () => {
     setLoading(true);
@@ -35,26 +41,53 @@ function MatchPage() {
 
   useEffect(() => { fetchFeed(); }, [fetchFeed]);
 
-const handleDelete = async (id) => {
-  if (!id) {
-    alert("No match id");
-    return;
-  }
-  try {
-    const url = (`http://localhost:5000/api/matches_feed/${encodeURIComponent(id)}`).trim(); // <-- trim!
-    const res = await fetch(url, { method: "DELETE" });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error("Delete error:", res.status, data);
-      alert(data.error || `Failed to delete (HTTP ${res.status})`);
-      return;
+  const handleDelete = async (id) => {
+    if (!id) return;
+    try {
+      const url = `http://localhost:5000/api/matches_feed/${encodeURIComponent(id)}`.trim();
+      const res = await fetch(url, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Failed to delete match");
+        return;
+      }
+      setItems((prev) => prev.filter((x) => x.id !== id));
+    } catch (err) {
+      alert(String(err.message || err));
     }
-    setItems((prev) => prev.filter((x) => x.id !== id));
-  } catch (err) {
-    console.error("Network error:", err);
-    alert("Network error while deleting (see console)");
-  }
-};
+  };
+
+  const openClip = async (m) => {
+    setClipErr("");
+    setClipLoading(true);
+    setClipUrl("");
+    setClipOpen(true);
+    try {
+      const params = new URLSearchParams({
+        video: m.video || "",
+        frame_idx: String(m.frame_idx ?? ""),
+        window: "5",
+        annotate: "1",
+      });
+      // If fps/box exist in feed, send them to save a meta lookup
+      if (typeof m.fps === "number") params.set("fps", String(m.fps));
+      if (Array.isArray(m.box) && m.box.length === 4) params.set("box", m.box.join(","));
+
+      const res = await fetch(`http://localhost:5000/api/video_snippet?${params.toString()}`);
+      const ct = res.headers.get("content-type") || "";
+      const isJson = ct.includes("application/json");
+      const data = isJson ? await res.json() : await res.text();
+      if (!res.ok) {
+        setClipErr((isJson ? data.error : String(data)) || `HTTP ${res.status}`);
+        return;
+      }
+      setClipUrl(`http://localhost:5000${data.url}`);
+    } catch (err) {
+      setClipErr(String(err.message || err));
+    } finally {
+      setClipLoading(false);
+    }
+  };
 
   return (
     <div className="main-page">
@@ -90,9 +123,10 @@ const handleDelete = async (id) => {
                   <div className="person-name" title={m.person_name || ""}>
                     {m.person_name || "Unknown person"}
                   </div>
-                  <button className="icon-btn danger" onClick={() => handleDelete(m.id)} title="Delete">
-                    ✖
-                  </button>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="btn secondary" onClick={() => openClip(m)} title="Watch 10s clip">▶ Watch</button>
+                    <button className="icon-btn danger" onClick={() => handleDelete(m.id)} title="Delete">✖</button>
+                  </div>
                 </div>
 
                 <div className="imgs-row">
@@ -125,6 +159,45 @@ const handleDelete = async (id) => {
             );
           })}
         </div>
+
+        {/* Simple modal for the 10s clip */}
+        {clipOpen && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 16,
+              zIndex: 1000,
+            }}
+            onClick={() => setClipOpen(false)}
+          >
+            <div
+              style={{ maxWidth: 900, width: "100%", background: "rgba(20,20,20,0.95)", borderRadius: 12, padding: 12 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ margin: 0 }}>🎬 10s clip</h3>
+                <button className="icon-btn" onClick={() => setClipOpen(false)}>✖</button>
+              </div>
+              <div style={{ marginTop: 10 }}>
+                {clipLoading && <p>Preparing clip…</p>}
+                {clipErr && <p className="error">{clipErr}</p>}
+                {clipUrl && (
+                  <video
+                    src={clipUrl}
+                    controls
+                    autoPlay
+                    style={{ width: "100%", borderRadius: 8, outline: "none" }}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

@@ -1,15 +1,17 @@
 # app.py
 # Flask API for SurveilNet:
-# - Video upload (no progress bar on frontend)
-# - Video processing in "store only" mode (saves embeddings+thumbs+meta into frame_store)
-# - Add person: computes embeddings, uploads ONLY that person to Firestore, searches matches,
-#               appends ALL matches to a feed (for MatchPage), returns best to caller.
-# - Static serving of frame_store files for <img src> usage in the UI.
+# - Video upload
+# - Async video processing (store-only) + terminal progress print
+# - Add person: store in Firestore, search matches, append bests to feed
+# - Serve frame_store files and short video snippets around a matched frame
+# - Matches feed (JSONL) with delete / best-per-person
+# NOTE: comments are in English only.
 
-from flask import Flask, request, jsonify, send_from_directory, send_file, make_response
+from typing import Optional
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-import signal, sys, threading
+import signal, sys, threading, subprocess
 from pathlib import Path
 import mimetypes
 import os
@@ -17,12 +19,15 @@ import uuid
 import json
 import time
 import torch
-import threading
 
 # Project models
 from models.face_database import FaceDatabase
-from models.face_matcher import FaceMatcher  # kept for VideoProcessor ctor shape
-from models.video_processor import VideoProcessor, search_best_match_for_person, search_matches_for_person
+from models.face_matcher import FaceMatcher
+from models.video_processor import (
+    VideoProcessor,
+    search_best_match_for_person,
+    search_matches_for_person,
+)
 
 # Firebase
 import firebase_admin
@@ -40,6 +45,7 @@ CORS(
     supports_credentials=False,
 )
 
+# Always add CORS headers (also on errors)
 @app.after_request
 def add_cors_headers(resp):
     resp.headers["Access-Control-Allow-Origin"] = "http://localhost:3000"
@@ -47,10 +53,11 @@ def add_cors_headers(resp):
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
     return resp
 
-# להחזיר 200 לכל preflight (OPTIONS) לכל נתיב
+# OPTIONS preflight ok
 @app.before_request
 def handle_preflight():
     if request.method == "OPTIONS":
+        from flask import make_response
         resp = make_response("", 200)
         resp.headers["Access-Control-Allow-Origin"] = "http://localhost:3000"
         resp.headers["Access-Control-Allow-Methods"] = "GET,POST,DELETE,OPTIONS"
@@ -61,38 +68,35 @@ def handle_preflight():
 
 STOP_EVENT = threading.Event()
 
-PROCESS_JOBS = {}  # job_id -> {"current": int, "total": int, "done": bool, "filename": str}
-PROCESS_LOCK = threading.Lock()
-
 # Folders
 UPLOAD_FOLDER = "uploads"
 VIDEO_FOLDER = "videos_database"
 VIDEO_TMP_FOLDER = "videos_tmp"
 MATCHES_FOLDER = "matches"
 FRAME_STORE_ROOT = "frame_store"
+SNIPPETS_FOLDER = "snippets"  # <--- new: for 10s clips
 
 # Keep only the best matches in the feed:
-FEED_MIN_SCORE = 0.70      # store only matches with score >= 0.70
-FEED_TOP_K = 1             # keep at most top 5 matches overall
-FEED_PER_VIDEO = True      # keep only the best match per video
-FEED_MIN_FRAME_GAP = 15    # (optional) min frame distance between kept matches in same video
+FEED_MIN_SCORE = 0.70
+FEED_TOP_K = 1
+FEED_PER_VIDEO = True
+FEED_MIN_FRAME_GAP = 15
 
-# Feed file for storing all matches (JSONL)
+# Feed file
 MATCHES_FEED_PATH = Path(MATCHES_FOLDER) / "matches.jsonl"
 
 # Allowed extensions
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "mp4"}
 
 # Ensure required folders exist
-for d in [UPLOAD_FOLDER, VIDEO_FOLDER, VIDEO_TMP_FOLDER, MATCHES_FOLDER, FRAME_STORE_ROOT]:
+for d in [UPLOAD_FOLDER, VIDEO_FOLDER, VIDEO_TMP_FOLDER, MATCHES_FOLDER, FRAME_STORE_ROOT, SNIPPETS_FOLDER]:
     os.makedirs(d, exist_ok=True)
 MATCHES_FEED_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 # Device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Firebase init
-# NOTE: adjust path to your own service account if needed
+# Firebase init (adjust path to your service account)
 cred = credentials.Certificate("configs/accountKey.json")
 firebase_admin.initialize_app(cred)
 db = firestore.client()
@@ -106,56 +110,18 @@ face_db = FaceDatabase()
 def _handle_sigint(signum, frame):
     print("\n[CTRL-C] Stopping now...", flush=True)
     STOP_EVENT.set()
-    # Hard-exit prevents hanging threads; use 130 (SIGINT)
     os._exit(130)
-
 
 signal.signal(signal.SIGINT, _handle_sigint)
 
-def make_progress_cb(job_id: str):
-    def _cb(cur: int, total: int):
-        with PROCESS_LOCK:
-            job = PROCESS_JOBS.get(job_id)
-            if job:
-                job["current"] = int(cur) + 1
-                job["total"] = max(int(total), 1)
-                job["done"] = (job["current"] >= job["total"])
-    return _cb
-
-def _run_processing_job(job_id: str, filename: str, video_meta: dict):
-    try:
-        matcher = FaceMatcher(face_db)  # not used in store_only
-        processor = VideoProcessor(
-            matcher=matcher,
-            output_folder=MATCHES_FOLDER,
-            frame_skip=5,
-            store_only=True,
-            video_meta=video_meta,
-            frame_store_root=FRAME_STORE_ROOT,
-            device=device,
-            stop_event=STOP_EVENT,
-            progress_cb=make_progress_cb(job_id),
-        )
-        video_path = os.path.join(VIDEO_FOLDER, filename)
-        processor.process_video(video_path)
-    except Exception as e:
-        print(f"[ERROR] job {job_id} failed: {e}")
-    finally:
-        with PROCESS_LOCK:
-            job = PROCESS_JOBS.get(job_id)
-            if job:
-                total = max(job.get("total", 1), 1)
-                job["current"] = total
-                job["total"] = total
-                job["done"] = True
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def append_matches_to_feed(person, matches: list) -> None:
     """
-    Append matches to a JSONL feed so the UI (MatchPage) can render a history.
-    Each line is a JSON object with person & match details.
+    Append selected matches to JSONL feed.
+    Now also persists fps and box (if available) so snippet can be created later.
     """
     if not matches:
         return
@@ -175,27 +141,24 @@ def append_matches_to_feed(person, matches: list) -> None:
                 "frame_idx": m.get("frame_idx"),
                 "frame_url": m.get("frame_url"),
                 "frame_image": m.get("frame_image"),
+                # NEW FIELDS:
+                "fps": m.get("fps"),
+                "box": m.get("box"),
             }
             fp.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
+
 def select_best_matches(matches, min_score=0.7, top_k=5, per_video=True, min_frame_gap=0):
     """
-    Filter and select only the 'best' matches:
-      - score >= min_score
-      - if per_video: keep only the single best match per video
-      - enforce a minimal frame gap (optional) to avoid near-duplicate frames
-      - finally, sort by score desc and keep top_k
+    Filter/select best matches by policy.
     """
     if not matches:
         return []
 
-    # 1) threshold
     filt = [m for m in matches if (m.get("score") or 0) >= float(min_score)]
-
     if not filt:
         return []
 
-    # 2) optionally pick only the best per video
     if per_video:
         best_by_video = {}
         for m in filt:
@@ -204,15 +167,12 @@ def select_best_matches(matches, min_score=0.7, top_k=5, per_video=True, min_fra
                 best_by_video[vid] = m
         filt = list(best_by_video.values())
 
-    # 3) optionally enforce minimal frame gap (per video)
     if min_frame_gap and min_frame_gap > 0:
         grouped = {}
         for m in filt:
             grouped.setdefault(m.get("video") or "__no_video__", []).append(m)
-
         pruned = []
         for vid, items in grouped.items():
-            # sort by frame index ascending (fallback to score)
             items.sort(key=lambda x: (x.get("frame_idx") is None, x.get("frame_idx", 0)))
             kept = []
             last_frame = None
@@ -224,9 +184,9 @@ def select_best_matches(matches, min_score=0.7, top_k=5, per_video=True, min_fra
             pruned.extend(kept)
         filt = pruned
 
-    # 4) sort by score desc and cut to top_k
     filt.sort(key=lambda x: x["score"], reverse=True)
     return filt[:max(1, int(top_k))]
+
 
 # ----------------------------- Health ----------------------------- #
 
@@ -257,9 +217,7 @@ def get_person(person_id):
 def add_person():
     """
     Add a single person and upload ONLY that person to Firestore.
-    After success, search stored frame embeddings (from /api/process_video) and:
-      - append ALL matches to feed (for MatchPage)
-      - return the BEST match in "last_seen" (or None)
+    Then search stored frames and append best matches to the feed.
     """
     try:
         first_name = request.form.get("first_name")
@@ -291,27 +249,20 @@ def add_person():
         if not img_paths:
             return jsonify({"error": "No valid images provided"}), 400
 
-        # Create the person and compute embeddings locally
         new_person = face_db.add_person(person_id, first_name, last_name, img_paths, age)
-
-        # Upload ONLY this person to Firestore (no bulk)
         face_db.upload_person_to_firestore(db, new_person)
 
-        # Optional: run search against stored frames (frame_store) if embeddings exist
         has_embed = (getattr(new_person, "mean_embedding", None) is not None) or bool(getattr(new_person, "embeddings", None))
         best = None
         if has_embed:
-            # get top matches (for feed) + best (for immediate UI)
             matches_list = search_matches_for_person(
                 new_person,
                 base_folder=FRAME_STORE_ROOT,
-                top_k=50,  # pull a generous set from disk first
-                min_score=0.50  # lower prefilter; we'll re-filter tighter for the feed
+                top_k=50,
+                min_score=0.50
             ) or []
 
-            best = None
             if matches_list:
-                # keep only the best ones for the feed, based on our stricter policy:
                 best_for_feed = select_best_matches(
                     matches_list,
                     min_score=FEED_MIN_SCORE,
@@ -320,13 +271,13 @@ def add_person():
                     min_frame_gap=FEED_MIN_FRAME_GAP,
                 )
                 if best_for_feed:
-                    best = best_for_feed[0]  # return best to the caller
-                    append_matches_to_feed(new_person, best_for_feed)  # persist only the best ones
+                    best = best_for_feed[0]
+                    append_matches_to_feed(new_person, best_for_feed)
 
         return jsonify({
             "message": f"Added {first_name} {last_name}",
             "id": person_id,
-            "last_seen": best  # may be None
+            "last_seen": best
         }), 201
 
     except Exception as e:
@@ -346,7 +297,6 @@ def upload_video():
     """
     Upload a video file with required metadata: start_time, location.
     Writes to a temporary .part file and then renames to final name.
-    If client aborts the upload, returns 499 and removes the partial file.
     """
     try:
         if "video" not in request.files:
@@ -371,7 +321,6 @@ def upload_video():
             with open(tmp_path, "wb") as out:
                 while True:
                     if STOP_EVENT.is_set():
-                        # cleanup and exit immediately
                         out.close()
                         try:
                             if os.path.exists(tmp_path):
@@ -396,10 +345,8 @@ def upload_video():
             finally:
                 return jsonify({"error": str(e)}), 500
 
-        # finalize move
         os.replace(tmp_path, final_path)
 
-        # store metadata next to video
         try:
             meta = {
                 "filename": filename,
@@ -418,207 +365,47 @@ def upload_video():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/process_video", methods=["POST"])
-def process_video():
-    """
-    Process a video to STORE embeddings & thumbnails ONLY (no matching here).
-    Requires JSON body: { "filename": "<name.mp4>" }
-    """
-    data = request.get_json()
-    if not data or "filename" not in data:
-        return jsonify({"error": "Filename is required in JSON body"}), 400
+# ----------------------------- Async processing (progress) ----------------------------- #
 
-    filename = secure_filename(data["filename"])
-    video_path = os.path.join(VIDEO_FOLDER, filename)
-    if not os.path.exists(video_path):
-        return jsonify({"error": f"Video file not found: {filename}"}), 404
+PROCESS_JOBS = {}  # job_id -> {"current": int, "total": int, "done": bool, "filename": str}
+PROCESS_LOCK = threading.Lock()
 
-    # load metadata saved at upload time (optional)
-    video_meta = {}
-    meta_path = os.path.join(VIDEO_FOLDER, f"{filename}.json")
-    if os.path.exists(meta_path):
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                video_meta = json.load(f)
-        except Exception:
-            video_meta = {}
+def make_progress_cb(job_id: str):
+    def _cb(cur: int, total: int):
+        with PROCESS_LOCK:
+            job = PROCESS_JOBS.get(job_id)
+            if job:
+                job["current"] = int(cur) + 1
+                job["total"] = max(int(total), 1)
+                job["done"] = (job["current"] >= job["total"])
+    return _cb
 
-    # Create processor in store-only mode (no matching)
-    matcher = FaceMatcher(face_db)  # not used in store_only mode
-    processor = VideoProcessor(
-        matcher=matcher,
-        output_folder=MATCHES_FOLDER,
-        frame_skip=5,
-        store_only=True,
-        video_meta=video_meta,
-        frame_store_root=FRAME_STORE_ROOT,
-        device=device,
-        stop_event=STOP_EVENT,
-    )
-    stats = processor.process_video(video_path)
-
-    return jsonify({"message": "Video processed (embeddings stored)", "video": filename, "stats": stats}), 200
-
-
-# ----------------------------- Matches / Feed ----------------------------- #
-
-@app.route("/api/matches_feed", methods=["GET"])
-def get_matches_feed():
-    """
-    Return saved matches as a list (newest first).
-    If best_per_person=1, return only the top-scoring match per person.
-    """
-    items = []
-    if MATCHES_FEED_PATH.exists():
-        with open(MATCHES_FEED_PATH, "r", encoding="utf-8") as fp:
-            for line in fp:
-                try:
-                    items.append(json.loads(line))
-                except Exception:
-                    continue
-
-    # newest first
-    items.sort(key=lambda x: x.get("ts", 0), reverse=True)
-
-    best_only = str(request.args.get("best_per_person", "0")).lower() in ("1", "true", "yes")
-    if best_only and items:
-        best_by_person = {}
-        for m in items:
-            pid = m.get("person_id") or "__unknown__"
-            cur = best_by_person.get(pid)
-            if cur is None:
-                best_by_person[pid] = m
-            else:
-                # prefer higher score; if tie, prefer newer (higher ts)
-                if (m.get("score", 0) > cur.get("score", 0)) or (
-                    m.get("score", 0) == cur.get("score", 0) and m.get("ts", 0) > cur.get("ts", 0)
-                ):
-                    best_by_person[pid] = m
-        items = list(best_by_person.values())
-        # keep consistent order: newest first
-        items.sort(key=lambda x: x.get("ts", 0), reverse=True)
-
-    return jsonify({"matches": items}), 200
-
-@app.route("/api/matches_feed/<match_id>", methods=["DELETE", "OPTIONS"])
-def delete_match_from_feed(match_id):
-    if request.method == "OPTIONS":
-        return ("", 200)  # preflight OK
-
-    if not MATCHES_FEED_PATH.exists():
-        return jsonify({"error": "Feed file not found"}), 404
-
-    kept, removed = [], 0
-    with open(MATCHES_FEED_PATH, "r", encoding="utf-8") as fp:
-        for line in fp:
-            try:
-                obj = json.loads(line)
-            except Exception:
-                continue
-            if obj.get("id") == match_id:
-                removed += 1
-            else:
-                kept.append(obj)
-
-    with open(MATCHES_FEED_PATH, "w", encoding="utf-8") as fp:
-        for obj in kept:
-            fp.write(json.dumps(obj, ensure_ascii=False) + "\n")
-
-    if removed == 0:
-        return jsonify({"error": "Match not found"}), 404
-    return jsonify({"message": f"Deleted {removed} match item", "deleted": removed}), 200
-
-# ----------------------------- Static serving for frame_store ----------------------------- #
-
-@app.route("/frame_store/<path:subpath>")
-def serve_frame_store(subpath):
-    """
-    Serve files from frame_store by relative URL.
-    Example: /frame_store/<video_name>/thumbs/215.jpg
-    """
-    safe_sub = subpath.replace("\\", "/")
-    root = Path(FRAME_STORE_ROOT).resolve()
-    p = (root / safe_sub).resolve()
-
-    if root not in p.parents and p != root:
-        return jsonify({"error": "path outside of frame_store"}), 403
-    if not p.is_file():
-        return jsonify({"error": f"file not found: {p.name}"}), 404
-
-    mime = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
-    return send_file(str(p), mimetype=mime)
-
-
-# (Optional) fallback route if frontend still uses ?path=...
-@app.route("/api/frame_image")
-def serve_frame_image():
-    """
-    Serve a frame image by absolute or relative path (query param 'path').
-    Enforces that the file is under frame_store.
-    """
-    raw_path = request.args.get("path") or ""
-    if not raw_path:
-        return jsonify({"error": "path query param is required"}), 400
-
-    raw_path = raw_path.replace("\\", "/")
-    p = Path(raw_path)
-    if not p.is_absolute():
-        p = Path(FRAME_STORE_ROOT) / p
-
-    root = Path(FRAME_STORE_ROOT).resolve()
+def _run_processing_job(job_id: str, filename: str, video_meta: dict):
     try:
-        p = p.resolve()
+        matcher = FaceMatcher(face_db)
+        processor = VideoProcessor(
+            matcher=matcher,
+            output_folder=MATCHES_FOLDER,
+            frame_skip=5,
+            store_only=True,
+            video_meta=video_meta,
+            frame_store_root=FRAME_STORE_ROOT,
+            device=device,
+            stop_event=STOP_EVENT,
+            progress_cb=make_progress_cb(job_id),
+        )
+        video_path = os.path.join(VIDEO_FOLDER, filename)
+        processor.process_video(video_path)
     except Exception as e:
-        return jsonify({"error": f"bad path: {e}"}), 400
-
-    if root not in p.parents and p != root:
-        return jsonify({"error": "path outside of frame_store"}), 403
-    if not p.is_file():
-        return jsonify({"error": f"file not found: {p.name}"}), 404
-
-    mime = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
-    return send_file(str(p), mimetype=mime)
-
-
-# ----------------------------- Legacy / Misc (kept if used elsewhere) ----------------------------- #
-
-@app.route("/matches/<filename>")
-def serve_match(filename):
-    return send_from_directory(MATCHES_FOLDER, filename)
-
-
-@app.route("/api/matches/<filename>", methods=["DELETE"])
-def delete_match(filename):
-    try:
-        file_path = os.path.join(MATCHES_FOLDER, filename)
-        if not os.path.exists(file_path):
-            return jsonify({"error": "File not found"}), 404
-        os.remove(file_path)
-        return jsonify({"message": f"File {filename} deleted successfully"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/matches", methods=["GET"])
-def get_matches():
-    files = [f for f in os.listdir(MATCHES_FOLDER) if allowed_file(f) and f.lower().endswith((".jpg", ".png"))]
-    return jsonify({"matches": files}), 200
-
-
-@app.route("/api/matches", methods=["DELETE"])
-def delete_all_matches():
-    try:
-        deleted_files = []
-        for filename in os.listdir(MATCHES_FOLDER):
-            if allowed_file(filename) and filename.lower().endswith((".jpg", ".png")):
-                file_path = os.path.join(MATCHES_FOLDER, filename)
-                os.remove(file_path)
-                deleted_files.append(filename)
-        if not deleted_files:
-            return jsonify({"message": "No matches found to delete"}), 200
-        return jsonify({"message": f"Deleted {len(deleted_files)} match files", "deleted_files": deleted_files}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[ERROR] job {job_id} failed: {e}")
+    finally:
+        with PROCESS_LOCK:
+            job = PROCESS_JOBS.get(job_id)
+            if job:
+                total = max(job.get("total", 1), 1)
+                job["current"] = total
+                job["total"] = total
+                job["done"] = True
 
 @app.route("/api/process_video_async", methods=["POST"])
 def process_video_async():
@@ -631,7 +418,6 @@ def process_video_async():
     if not os.path.exists(video_path):
         return jsonify({"error": f"Video file not found: {filename}"}), 404
 
-    # load optional meta (saved at upload)
     meta_path = os.path.join(VIDEO_FOLDER, f"{filename}.json")
     video_meta = {}
     if os.path.exists(meta_path):
@@ -649,7 +435,6 @@ def process_video_async():
     t.start()
 
     return jsonify({"job_id": job_id}), 202
-
 
 @app.route("/api/process_status", methods=["GET"])
 def process_status():
@@ -674,19 +459,291 @@ def process_status():
         "done": done
     }), 200
 
+
+# ----------------------------- Matches / Feed ----------------------------- #
+
+@app.route("/api/matches_feed", methods=["GET"])
+def get_matches_feed():
+    """
+    Return saved matches as a list (newest first).
+    If best_per_person=1, return only the top-scoring match per person.
+    """
+    items = []
+    if MATCHES_FEED_PATH.exists():
+        with open(MATCHES_FEED_PATH, "r", encoding="utf-8") as fp:
+            for line in fp:
+                try:
+                    items.append(json.loads(line))
+                except Exception:
+                    continue
+
+    items.sort(key=lambda x: x.get("ts", 0), reverse=True)
+
+    best_only = str(request.args.get("best_per_person", "0")).lower() in ("1", "true", "yes")
+    if best_only and items:
+        best_by_person = {}
+        for m in items:
+            pid = m.get("person_id") or "__unknown__"
+            cur = best_by_person.get(pid)
+            if cur is None:
+                best_by_person[pid] = m
+            else:
+                if (m.get("score", 0) > cur.get("score", 0)) or (
+                    m.get("score", 0) == cur.get("score", 0) and m.get("ts", 0) > cur.get("ts", 0)
+                ):
+                    best_by_person[pid] = m
+        items = list(best_by_person.values())
+        items.sort(key=lambda x: x.get("ts", 0), reverse=True)
+
+    return jsonify({"matches": items}), 200
+
+@app.route("/api/matches_feed/<match_id>", methods=["DELETE", "OPTIONS"])
+def delete_match_from_feed(match_id):
+    if request.method == "OPTIONS":
+        return ("", 200)
+
+    if not MATCHES_FEED_PATH.exists():
+        return jsonify({"error": "Feed file not found"}), 404
+
+    kept, removed = [], 0
+    with open(MATCHES_FEED_PATH, "r", encoding="utf-8") as fp:
+        for line in fp:
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            if obj.get("id") == match_id:
+                removed += 1
+            else:
+                kept.append(obj)
+
+    with open(MATCHES_FEED_PATH, "w", encoding="utf-8") as fp:
+        for obj in kept:
+            fp.write(json.dumps(obj, ensure_ascii=False) + "\n")
+
+    if removed == 0:
+        return jsonify({"error": "Match not found"}), 404
+    return jsonify({"message": f"Deleted {removed} match item", "deleted": removed}), 200
+
+
+# ----------------------------- frame_store & snippets serving ----------------------------- #
+
+@app.route("/frame_store/<path:subpath>")
+def serve_frame_store(subpath):
+    """
+    Serve files from frame_store by relative URL.
+    Example: /frame_store/<video_name>/thumbs/215.jpg
+    """
+    safe_sub = subpath.replace("\\", "/")
+    root = Path(FRAME_STORE_ROOT).resolve()
+    p = (root / safe_sub).resolve()
+
+    if root not in p.parents and p != root:
+        return jsonify({"error": "path outside of frame_store"}), 403
+    if not p.is_file():
+        return jsonify({"error": f"file not found: {p.name}"}), 404
+
+    mime = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
+    return send_file(str(p), mimetype=mime)
+
+@app.route("/api/frame_image")
+def serve_frame_image():
+    raw_path = request.args.get("path") or ""
+    if not raw_path:
+        return jsonify({"error": "path query param is required"}), 400
+
+    raw_path = raw_path.replace("\\", "/")
+    p = Path(raw_path)
+    if not p.is_absolute():
+        p = Path(FRAME_STORE_ROOT) / p
+
+    root = Path(FRAME_STORE_ROOT).resolve()
+    try:
+        p = p.resolve()
+    except Exception as e:
+        return jsonify({"error": f"bad path: {e}"}), 400
+
+    if root not in p.parents and p != root:
+        return jsonify({"error": "path outside of frame_store"}), 403
+    if not p.is_file():
+        return jsonify({"error": f"file not found: {p.name}"}), 404
+
+    mime = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
+    return send_file(str(p), mimetype=mime)
+
+# NEW: serve pre-generated snippets
+@app.route("/snippets/<path:filename>")
+def serve_snippet(filename):
+    safe = filename.replace("\\", "/")
+    root = Path(SNIPPETS_FOLDER).resolve()
+    p = (root / safe).resolve()
+    if root not in p.parents and p != root:
+        return jsonify({"error": "path outside of snippets"}), 403
+    if not p.is_file():
+        return jsonify({"error": "file not found"}), 404
+    mime = "video/mp4"
+    return send_file(str(p), mimetype=mime)
+
+
+# ----------------------------- Video snippet API ----------------------------- #
+
+def _find_meta_record(video_name_noext: str, frame_idx: int) -> Optional[dict]:
+    """
+    Load frame_store/<video_name_noext>/meta.jsonl and return record with matching frame_idx.
+    """
+    meta_path = Path(FRAME_STORE_ROOT) / video_name_noext / "meta.jsonl"
+    if not meta_path.is_file():
+        return None
+    try:
+        with open(meta_path, "r", encoding="utf-8") as fp:
+            for line in fp:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+                if int(rec.get("frame_idx", -1)) == int(frame_idx):
+                    return rec
+    except Exception:
+        return None
+    return None
+
+def _ffmpeg_exists() -> bool:
+    try:
+        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        return True
+    except Exception:
+        return False
+
+@app.route("/api/video_snippet", methods=["GET"])
+def api_video_snippet():
+    """
+    Create (or return cached) 10s clip around a matched frame.
+    Params:
+      - video: filename (e.g., video.mp4)
+      - frame_idx: integer frame index
+      - window: seconds before/after (default 5)
+      - annotate: 1/0 draw face box if available (default 1)
+    Returns JSON: { url, start, duration, annotated }
+    """
+    video = request.args.get("video") or ""
+    frame_idx = request.args.get("frame_idx") or ""
+    window = float(request.args.get("window", 5))
+    annotate = str(request.args.get("annotate", "1")).lower() in ("1", "true", "yes")
+
+    if not video or frame_idx == "":
+        return jsonify({"error": "video and frame_idx are required"}), 400
+
+    try:
+        frame_idx = int(frame_idx)
+    except Exception:
+        return jsonify({"error": "frame_idx must be integer"}), 400
+
+    filename = secure_filename(video)
+    video_path = Path(VIDEO_FOLDER) / filename
+    if not video_path.is_file():
+        return jsonify({"error": f"Video not found: {filename}"}), 404
+
+    # try to get fps/box from request (optional)
+    fps = request.args.get("fps", type=float)
+    box = request.args.get("box")  # expected "x1,y1,x2,y2" if provided
+
+    # fallback: read meta.jsonl for frame record
+    if fps is None or (annotate and not box):
+        meta_rec = _find_meta_record(Path(filename).stem, frame_idx)
+        if meta_rec:
+            if fps is None:
+                fps = float(meta_rec.get("fps") or 25.0)
+            if annotate and not box and meta_rec.get("box"):
+                b = meta_rec["box"]
+                if isinstance(b, list) and len(b) == 4:
+                    box = ",".join(map(str, b))
+
+    if fps is None:
+        fps = 25.0
+
+    center_t = max(frame_idx, 0) / max(fps, 1.0)
+    start = max(center_t - window, 0.0)
+    duration = max(window * 2.0, 0.1)
+
+    # cache filename
+    key = f"{Path(filename).stem}__f{frame_idx}__w{int(window)}__ann{1 if annotate and box else 0}.mp4"
+    out_path = Path(SNIPPETS_FOLDER) / key
+    if out_path.is_file():
+        return jsonify({"url": f"/snippets/{out_path.name}", "start": start, "duration": duration, "annotated": bool(annotate and box)}), 200
+
+    # build ffmpeg command
+    cmd = ["ffmpeg", "-y", "-ss", f"{start:.3f}", "-i", str(video_path), "-t", f"{duration:.3f}"]
+    draw = None
+    if annotate and box:
+        try:
+            x1, y1, x2, y2 = [int(v) for v in box.split(",")]
+            w = max(1, x2 - x1)
+            h = max(1, y2 - y1)
+            draw = f"drawbox=x={x1}:y={y1}:w={w}:h={h}:color=red@0.8:thickness=4"
+        except Exception:
+            draw = None
+
+    if draw:
+        cmd += ["-vf", draw]
+
+    # Re-encode (veryfast) for compatibility
+    cmd += ["-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac", str(out_path)]
+
+    if _ffmpeg_exists():
+        try:
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return jsonify({"url": f"/snippets/{out_path.name}", "start": start, "duration": duration, "annotated": bool(draw)}), 200
+        except Exception as e:
+            # fallback later
+            print(f"[WARN] ffmpeg failed: {e}")
+
+    # Fallback (rare): just return error if ffmpeg unavailable/failed
+    return jsonify({"error": "Failed to create snippet (ffmpeg missing or failed)."}), 500
+
+
+# ----------------------------- Legacy / Misc ----------------------------- #
+
+@app.route("/matches/<filename>")
+def serve_match(filename):
+    return send_from_directory(MATCHES_FOLDER, filename)
+
+@app.route("/api/matches/<filename>", methods=["DELETE"])
+def delete_match(filename):
+    try:
+        file_path = os.path.join(MATCHES_FOLDER, filename)
+        if not os.path.exists(file_path):
+            return jsonify({"error": "File not found"}), 404
+        os.remove(file_path)
+        return jsonify({"message": f"File {filename} deleted successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/matches", methods=["GET"])
+def get_matches():
+    files = [f for f in os.listdir(MATCHES_FOLDER) if allowed_file(f) and f.lower().endswith((".jpg", ".png"))]
+    return jsonify({"matches": files}), 200
+
+@app.route("/api/matches", methods=["DELETE"])
+def delete_all_matches():
+    try:
+        deleted_files = []
+        for filename in os.listdir(MATCHES_FOLDER):
+            if allowed_file(filename) and filename.lower().endswith((".jpg", ".png")):
+                file_path = os.path.join(MATCHES_FOLDER, filename)
+                os.remove(file_path)
+                deleted_files.append(filename)
+        if not deleted_files:
+            return jsonify({"message": "No matches found to delete"}), 200
+        return jsonify({"message": f"Deleted {len(deleted_files)} match files", "deleted_files": deleted_files}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ----------------------------- Main ----------------------------- #
 
 if __name__ == "__main__":
-    # Initialize people DB from Firestore on startup
     USE_FIRESTORE = True
     if USE_FIRESTORE:
         face_db.load_from_firestore(db)
         print(f"[INFO] Loaded {len(face_db.people)} people from Firestore.")
-    else:
-        # Optional: local bootstrap (not recommended when using Firestore)
-        gallery_folder = "database"
-        # face_db.build_from_folder(gallery_folder)
-        # face_db.upload_to_firestore(db)
-        pass
-
     app.run(debug=True, use_reloader=False, host="127.0.0.1", port=5000)
