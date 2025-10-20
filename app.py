@@ -81,7 +81,7 @@ FRAME_STORE_ROOT = "frame_store"
 SNIPPETS_FOLDER = "snippets"  # for 10s clips
 
 # Keep only the best matches in the feed:
-FEED_MIN_SCORE = 0.70
+FEED_MIN_SCORE = 0.50
 FEED_TOP_K = 1
 FEED_PER_VIDEO = True
 FEED_MIN_FRAME_GAP = 15
@@ -151,7 +151,7 @@ def append_matches_to_feed(person, matches: list) -> None:
             fp.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
-def select_best_matches(matches, min_score=0.55, top_k=5, per_video=True, min_frame_gap=0):
+def select_best_matches(matches, min_score=0.50, top_k=5, per_video=True, min_frame_gap=0):
     """
     Filter/select best matches by policy.
     """

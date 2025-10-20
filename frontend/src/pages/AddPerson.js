@@ -1,212 +1,250 @@
-import { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import "./AddPerson.css";
 
-/**
- * AddPerson
- * - Submits person data + images to /api/people (multipart/form-data).
- * - After success, renders "Last seen" card with place/time and the matched frame.
- * - Prefers server-provided lastSeen.frame_url (served by /frame_store/.. route).
- * - Falls back to /api/frame_image?path=... if frame_url is not available.
- */
 function AddPerson() {
   const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [age, setAge] = useState("");
-  const [images, setImages] = useState([]);
-  const [message, setMessage] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [lastName, setLastName]   = useState("");
+  const [age, setAge]             = useState("");
 
-  const [result, setResult] = useState(null);
-  const [lastSeen, setLastSeen] = useState(null);
+  const [images, setImages]       = useState([]);   // File[]
+  const [previews, setPreviews]   = useState([]);   // object URLs
+  const [message, setMessage]     = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  // Preview of first selected image
-  const previewUrl = useMemo(() => {
-    if (!images || images.length === 0) return null;
-    return URL.createObjectURL(images[0]);
+  // Best match returned by backend on save (or null)
+  const [best, setBest] = useState(null);
+  const [notFound, setNotFound] = useState(false);  // “no match found” flag
+
+  // Clip modal
+  const [clipOpen, setClipOpen] = useState(false);
+  const [clipUrl, setClipUrl]   = useState("");
+  const [clipKind, setClipKind] = useState("video");
+  const [clipLoading, setClipLoading] = useState(false);
+  const [clipErr, setClipErr] = useState("");
+
+  // handle files
+  const onFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+    setImages(files);
+    setBest(null);
+    setNotFound(false);
+  };
+
+  // build previews from selected files
+  useEffect(() => {
+    previews.forEach((u) => URL.revokeObjectURL(u));
+    if (!images || images.length === 0) {
+      setPreviews([]);
+      return;
+    }
+    const urls = images.map((f) => URL.createObjectURL(f));
+    setPreviews(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images]);
+
+  // first preview acts as the reference visual
+  const referenceSrc = useMemo(() => (previews[0] ? previews[0] : null), [previews]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!firstName || !lastName) {
-      setMessage("Please fill first and last name");
-      return;
-    }
-    if (!images || images.length === 0) {
-      setMessage("Please select at least one image");
+    setMessage("");
+
+    if (!firstName || !lastName || images.length === 0) {
+      setMessage("Please fill first/last name and select at least one image.");
       return;
     }
 
-    setSaving(true);
-    setMessage("Uploading person…");
-    setResult(null);
-    setLastSeen(null);
+    setSubmitting(true);
+    setBest(null);
+    setNotFound(false);
 
     try {
-      const formData = new FormData();
-      formData.append("first_name", firstName);
-      formData.append("last_name", lastName);
-      if (age) formData.append("age", age);
-      images.forEach((file) => formData.append("images", file));
+      const form = new FormData();
+      form.append("first_name", firstName);
+      form.append("last_name", lastName);
+      if (age) form.append("age", age);
+      images.forEach((f) => form.append("images", f));
 
       const res = await fetch("http://localhost:5000/api/people", {
         method: "POST",
-        body: formData,
+        body: form,
       });
       const data = await res.json();
 
       if (!res.ok) {
         setMessage(data.error || "Failed to add person");
-        setSaving(false);
         return;
       }
 
-      setMessage(`Success: ${data.message}`);
-      setResult(data);
-      setLastSeen(data.last_seen || null);
+      setMessage(data.message || "Person added");
+      const lastSeen = data.last_seen || null;
+      setBest(lastSeen);
+      setNotFound(!lastSeen);
     } catch (err) {
-      setMessage(`Error: ${err.message}`);
+      setMessage(String(err.message || err));
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
-  // Prefer server's frame_url; fallback to /api/frame_image?path=...
-  const frameImageUrl = lastSeen?.frame_url
-    ? `http://localhost:5000${lastSeen.frame_url}`
-    : lastSeen?.frame_image
-      ? `http://localhost:5000/api/frame_image?path=${encodeURIComponent(
-          lastSeen.frame_image
-        )}`
-      : null;
+  // open 10s clip for current best
+  const openClip = async () => {
+    if (!best) return;
+    setClipErr("");
+    setClipLoading(true);
+    setClipUrl("");
+    setClipKind("video");
+    setClipOpen(true);
+
+    try {
+      const params = new URLSearchParams({
+        video: best.video || "",
+        frame_idx: String(best.frame_idx ?? ""),
+        window: "5",
+        annotate: "1",
+      });
+      if (typeof best.fps === "number") params.set("fps", String(best.fps));
+      if (Array.isArray(best.box) && best.box.length === 4) params.set("box", best.box.join(","));
+
+      const res = await fetch(`http://localhost:5000/api/video_snippet?${params.toString()}`);
+      const ct = res.headers.get("content-type") || "";
+      const isJson = ct.includes("application/json");
+      const payload = isJson ? await res.json() : await res.text();
+
+      if (!res.ok) {
+        setClipErr((isJson ? payload.error : String(payload)) || `HTTP ${res.status}`);
+        return;
+      }
+
+      const absolute = `http://localhost:5000${payload.url}`;
+      setClipKind(payload.kind || "video");
+      setClipUrl(absolute);
+    } catch (err) {
+      setClipErr(String(err.message || err));
+    } finally {
+      setClipLoading(false);
+    }
+  };
+
+  // helpers for meta view
+  const val = (x) => (x === 0 || x ? x : "—");
+  const scoreStr = best?.score?.toFixed ? best.score.toFixed(3) : best?.score;
 
   return (
-    <div className="main-page">
-      <div className="card" style={{ maxWidth: 900 }}>
-        <h2>➕ Add Person</h2>
-
-        <form
-          onSubmit={handleSubmit}
-          style={{ display: "flex", flexDirection: "column", gap: 12 }}
-        >
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label style={{ fontWeight: 600 }}>First name</label>
-              <input
-                type="text"
-                placeholder="First name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label style={{ fontWeight: 600 }}>Last name</label>
-              <input
-                type="text"
-                placeholder="Last name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-              />
-            </div>
+    <div className="ap-shell">
+      <div className="ap-card">
+        <div className="ap-header">
+          <h2>Add Person</h2>
+          <div className="ap-actions">
+            <Link to="/"><button className="btn secondary" type="button">⬅ Back</button></Link>
           </div>
+        </div>
 
-          <div>
-            <label style={{ fontWeight: 600 }}>Age (optional)</label>
-            <input
-              type="number"
-              min="0"
-              placeholder="Age"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-            />
+        {/* form */}
+        <form onSubmit={handleSubmit} className="ap-form">
+          <div className="ap-field">
+            <label>First name</label>
+            <input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
           </div>
-
-          <div>
-            <label style={{ fontWeight: 600 }}>Images (at least one)</label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => setImages(Array.from(e.target.files || []))}
-            />
+          <div className="ap-field">
+            <label>Last name</label>
+            <input value={lastName} onChange={(e) => setLastName(e.target.value)} />
           </div>
-
-          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-            <button type="submit" className="btn" disabled={saving}>
-              {saving ? "Saving..." : "Save Person"}
+          <div className="ap-field">
+            <label>Age (optional)</label>
+            <input value={age} onChange={(e) => setAge(e.target.value)} />
+          </div>
+          <div className="ap-field">
+            <label>Images</label>
+            <input type="file" accept="image/*" multiple onChange={onFiles} />
+          </div>
+          <div className="ap-buttons">
+            <button className="btn" type="submit" disabled={submitting}>
+              {submitting ? "Saving..." : "Save Person"}
             </button>
-            <Link to="/">
-              <button type="button" className="btn secondary">⬅ Back</button>
-            </Link>
           </div>
         </form>
 
-        {message && <p style={{ marginTop: 10 }}>{message}</p>}
+        {message && <p className="ap-msg">{message}</p>}
 
-        {(previewUrl || lastSeen) && (
-          <div
-            style={{
-              marginTop: 18,
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 16,
-              alignItems: "start",
-            }}
-          >
-            {/* Left: uploaded reference preview */}
-            <div className="card" style={{ padding: 12 }}>
-              <h3 style={{ marginTop: 0 }}>Reference (uploaded)</h3>
-              {previewUrl ? (
-                <img
-                  src={previewUrl}
-                  alt="reference"
-                  style={{ width: "100%", borderRadius: 8, objectFit: "cover" }}
-                  onLoad={() => URL.revokeObjectURL(previewUrl)}
-                />
+        {/* Always-visible match container */}
+        <div className="ap-match">
+          <div className="ap-match-head">
+            <div className="ap-match-title">Best match</div>
+            <button
+              className="btn secondary"
+              onClick={openClip}
+              disabled={!best}
+              title={best ? "Watch 10s clip" : "No match yet"}
+            >
+              ▶ Watch
+            </button>
+          </div>
+
+          <div className="ap-media">
+            {/* Reference (left) */}
+            <div className="ap-media-tile">
+              {referenceSrc ? (
+                <img src={referenceSrc} alt="reference" />
               ) : (
-                <div>No preview</div>
+                <div className="ap-img-placeholder">Upload an image to preview here</div>
               )}
-              <div style={{ marginTop: 8 }}>
-                <div><strong>Name:</strong> {firstName} {lastName}</div>
-                {age && <div><strong>Age:</strong> {age}</div>}
-              </div>
+              <div className="ap-caption">Reference</div>
             </div>
 
-            {/* Right: best match from stored frames */}
-            <div className="card" style={{ padding: 12 }}>
-              <h3 style={{ marginTop: 0 }}>Best match (from videos)</h3>
-              {lastSeen ? (
-                <>
-                  {frameImageUrl ? (
-                    <img
-                      src={frameImageUrl}
-                      alt="matched frame"
-                      style={{ width: "100%", borderRadius: 8, objectFit: "cover" }}
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
-                    />
-                  ) : (
-                    <div style={{ opacity: 0.8 }}>
-                      Frame image URL not available.
-                    </div>
-                  )}
-                  <div style={{ marginTop: 8 }}>
-                    <div><strong>Score:</strong> {lastSeen.score?.toFixed?.(3) ?? lastSeen.score}</div>
-                    <div><strong>Place:</strong> {lastSeen.place || "Unknown"}</div>
-                    <div><strong>Time:</strong> {lastSeen.time || lastSeen.time_iso || "Unknown"}</div>
-                    {lastSeen.video && (
-                      <div><strong>Video:</strong> {lastSeen.video} (frame #{lastSeen.frame_idx})</div>
-                    )}
-                    {lastSeen.label && <div style={{ marginTop: 6 }}>{lastSeen.label}</div>}
-                  </div>
-                </>
+            {/* Matched frame (right) */}
+            <div className="ap-media-tile">
+              {best?.frame_url ? (
+                <img src={`http://localhost:5000${best.frame_url}`} alt="matched frame" />
+              ) : best?.frame_image ? (
+                <img
+                  src={`http://localhost:5000/api/frame_image?path=${encodeURIComponent(best.frame_image)}`}
+                  alt="matched frame"
+                />
               ) : (
-                <div>No matches found in processed videos.</div>
+                <div className="ap-img-placeholder">
+                  {notFound ? "No match found in processed videos" : "No match yet"}
+                </div>
+              )}
+              <div className="ap-caption">Matched frame</div>
+            </div>
+          </div>
+
+          {/* meta row */}
+          <div className="ap-meta">
+            <div className="ap-kv"><span>Score</span><span>{best ? val(scoreStr) : "—"}</span></div>
+            <div className="ap-kv"><span>Place</span><span>{best ? val(best.place) : "—"}</span></div>
+            <div className="ap-kv"><span>Time</span><span>{best ? val(best.time_iso) : "—"}</span></div>
+            <div className="ap-kv"><span>Video</span><span>{best ? val(best.video) : "—"}</span></div>
+            <div className="ap-kv"><span>Frame</span><span>{best ? val(best.frame_idx) : "—"}</span></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Clip modal */}
+      {clipOpen && (
+        <div className="ap-modal" onClick={() => setClipOpen(false)}>
+          <div className="ap-modal-inner" onClick={(e) => e.stopPropagation()}>
+            <div className="ap-modal-head">
+              <h3 style={{ margin: 0 }}>🎬 10s clip</h3>
+              <button className="icon-btn" onClick={() => setClipOpen(false)}>✖</button>
+            </div>
+
+            <div style={{ marginTop: 10 }}>
+              {clipLoading && <p>Preparing clip…</p>}
+              {clipErr && <p className="error">{clipErr}</p>}
+              {clipUrl && clipKind === "video" && (
+                <video src={clipUrl} controls autoPlay style={{ width: "100%", borderRadius: 8 }} />
+              )}
+              {clipUrl && clipKind === "gif" && (
+                <img src={clipUrl} alt="snippet gif" style={{ width: "100%", borderRadius: 8 }} />
               )}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
