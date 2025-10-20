@@ -7,7 +7,6 @@
 # - Matches feed (JSONL) with delete / best-per-person
 # NOTE: comments are in English only.
 
-from typing import Optional
 from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -19,6 +18,11 @@ import uuid
 import json
 import time
 import torch
+import cv2  # <-- OpenCV for video snippets
+from typing import Optional
+import imageio.v2 as iio
+import subprocess, shutil
+import imageio_ffmpeg
 
 # Project models
 from models.face_database import FaceDatabase
@@ -74,7 +78,7 @@ VIDEO_FOLDER = "videos_database"
 VIDEO_TMP_FOLDER = "videos_tmp"
 MATCHES_FOLDER = "matches"
 FRAME_STORE_ROOT = "frame_store"
-SNIPPETS_FOLDER = "snippets"  # <--- new: for 10s clips
+SNIPPETS_FOLDER = "snippets"  # for 10s clips
 
 # Keep only the best matches in the feed:
 FEED_MIN_SCORE = 0.70
@@ -121,7 +125,7 @@ def allowed_file(filename: str) -> bool:
 def append_matches_to_feed(person, matches: list) -> None:
     """
     Append selected matches to JSONL feed.
-    Now also persists fps and box (if available) so snippet can be created later.
+    Also persists fps and box (if available) so snippet can be created later.
     """
     if not matches:
         return
@@ -141,14 +145,13 @@ def append_matches_to_feed(person, matches: list) -> None:
                 "frame_idx": m.get("frame_idx"),
                 "frame_url": m.get("frame_url"),
                 "frame_image": m.get("frame_image"),
-                # NEW FIELDS:
                 "fps": m.get("fps"),
                 "box": m.get("box"),
             }
             fp.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
-def select_best_matches(matches, min_score=0.7, top_k=5, per_video=True, min_frame_gap=0):
+def select_best_matches(matches, min_score=0.55, top_k=5, per_video=True, min_frame_gap=0):
     """
     Filter/select best matches by policy.
     """
@@ -571,7 +574,7 @@ def serve_frame_image():
     mime = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
     return send_file(str(p), mimetype=mime)
 
-# NEW: serve pre-generated snippets
+# Serve pre-generated snippets
 @app.route("/snippets/<path:filename>")
 def serve_snippet(filename):
     safe = filename.replace("\\", "/")
@@ -585,7 +588,7 @@ def serve_snippet(filename):
     return send_file(str(p), mimetype=mime)
 
 
-# ----------------------------- Video snippet API ----------------------------- #
+# ----------------------------- Video snippet API (OpenCV) ----------------------------- #
 
 def _find_meta_record(video_name_noext: str, frame_idx: int) -> Optional[dict]:
     """
@@ -607,34 +610,119 @@ def _find_meta_record(video_name_noext: str, frame_idx: int) -> Optional[dict]:
         return None
     return None
 
-def _ffmpeg_exists() -> bool:
+def _open_writer_mp4(out_path: Path, fps: float, size: tuple) -> Optional[cv2.VideoWriter]:
+    """
+    Try to open a cv2.VideoWriter for MP4 using several common codecs.
+    Returns an opened writer or None.
+    """
+    w, h = size
+    # Try mp4v (most common on Windows)
+    for fourcc_str in ("mp4v", "avc1"):
+        fourcc = cv2.VideoWriter_fourcc(*fourcc_str)
+        writer = cv2.VideoWriter(str(out_path), fourcc, float(max(fps, 1.0)), (int(w), int(h)))
+        if writer.isOpened():
+            return writer
+        writer.release()
+    return None
+
+def _write_mp4_opencv(out_path: Path, cap, start_frame, end_frame, fps, size, draw_box):
+    writer = _open_writer_mp4(out_path, fps, size)
+    if writer is None:
+        return 0
+    count = 0
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+    cur = start_frame
+    while cur <= end_frame:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        if draw_box:
+            x1, y1, x2, y2 = draw_box
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+        writer.write(frame)
+        count += 1
+        cur += 1
+    writer.release()
+    return count
+
+def _write_gif(out_path: Path, cap, start_frame, end_frame, fps, draw_box):
+    frames = []
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+    cur = start_frame
+    while cur <= end_frame:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        if draw_box:
+            x1, y1, x2, y2 = draw_box
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+        # BGR -> RGB for GIF
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frames.append(frame_rgb)
+        cur += 1
+    if not frames:
+        return 0
+    # duration per frame in seconds
+    per = 1.0 / max(fps, 1.0)
+    iio.mimsave(out_path, frames, duration=per, loop=0)  # infinite loop
+    return len(frames)
+
+def ensure_h264(mp4_in: Path) -> Path:
+    """
+    If mp4_in isn't H.264, create (once) an H.264 copy next to it and return the new path.
+    Uses imageio-ffmpeg bundled ffmpeg — no system install needed.
+    """
+    mp4_in = Path(mp4_in)
+    out = mp4_in.with_name(mp4_in.stem + "_h264.mp4")
+    if out.is_file() and out.stat().st_size > 0:
+        return out
+
+    ff = imageio_ffmpeg.get_ffmpeg_exe()  # bundled ffmpeg path
+    # Fast transcode to H.264 baseline (compatible with browsers) / yuv420p / faststart
+    cmd = [
+        ff, "-y",
+        "-i", str(mp4_in),
+        "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "baseline",
+        "-level", "3.0", "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        "-an",  # no audio
+        str(out)
+    ]
     try:
-        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-        return True
-    except Exception:
-        return False
+        subprocess.run(cmd, check=True, capture_output=True)
+        if out.is_file() and out.stat().st_size > 0:
+            return out
+    except Exception as e:
+        print("[H264] transcode failed:", e)
+    # fallback
+    return mp4_in
+
 
 @app.route("/api/video_snippet", methods=["GET"])
 def api_video_snippet():
     """
-    Create (or return cached) 10s clip around a matched frame.
-    Params:
-      - video: filename (e.g., video.mp4)
-      - frame_idx: integer frame index
+    Create (or return cached) ~10s MP4 clip around a matched frame.
+    Flow:
+      1) Read frames with OpenCV and write MP4 (mp4v).
+      2) Transcode to H.264 (baseline/yuv420p) via imageio-ffmpeg for browser playback.
+      3) Return URL under /snippets/.
+    Query params:
+      - video: filename in videos_database (e.g. video.mp4)
+      - frame_idx: integer
       - window: seconds before/after (default 5)
-      - annotate: 1/0 draw face box if available (default 1)
-    Returns JSON: { url, start, duration, annotated }
+      - annotate: 1/0 draw face box
+      - (optional) fps: override FPS
+      - (optional) box: "x1,y1,x2,y2"
     """
     video = request.args.get("video") or ""
-    frame_idx = request.args.get("frame_idx") or ""
+    frame_idx_q = request.args.get("frame_idx") or ""
     window = float(request.args.get("window", 5))
     annotate = str(request.args.get("annotate", "1")).lower() in ("1", "true", "yes")
 
-    if not video or frame_idx == "":
+    if not video or frame_idx_q == "":
         return jsonify({"error": "video and frame_idx are required"}), 400
-
     try:
-        frame_idx = int(frame_idx)
+        frame_idx = int(frame_idx_q)
     except Exception:
         return jsonify({"error": "frame_idx must be integer"}), 400
 
@@ -643,63 +731,103 @@ def api_video_snippet():
     if not video_path.is_file():
         return jsonify({"error": f"Video not found: {filename}"}), 404
 
-    # try to get fps/box from request (optional)
-    fps = request.args.get("fps", type=float)
-    box = request.args.get("box")  # expected "x1,y1,x2,y2" if provided
+    # Open video
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        return jsonify({"error": "Failed to open video"}), 500
 
-    # fallback: read meta.jsonl for frame record
-    if fps is None or (annotate and not box):
+    # fps / frame count / size
+    cap_fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+    if cap_fps <= 0:
+        cap_fps = request.args.get("fps", type=float) or 25.0  # fallback
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+    if width == 0 or height == 0:
+        ok, frm = cap.read()
+        if ok:
+            height, width = frm.shape[:2]
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+    # Box
+    box_str = request.args.get("box")
+    if annotate and not box_str:
         meta_rec = _find_meta_record(Path(filename).stem, frame_idx)
-        if meta_rec:
-            if fps is None:
-                fps = float(meta_rec.get("fps") or 25.0)
-            if annotate and not box and meta_rec.get("box"):
-                b = meta_rec["box"]
-                if isinstance(b, list) and len(b) == 4:
-                    box = ",".join(map(str, b))
-
-    if fps is None:
-        fps = 25.0
-
-    center_t = max(frame_idx, 0) / max(fps, 1.0)
-    start = max(center_t - window, 0.0)
-    duration = max(window * 2.0, 0.1)
-
-    # cache filename
-    key = f"{Path(filename).stem}__f{frame_idx}__w{int(window)}__ann{1 if annotate and box else 0}.mp4"
-    out_path = Path(SNIPPETS_FOLDER) / key
-    if out_path.is_file():
-        return jsonify({"url": f"/snippets/{out_path.name}", "start": start, "duration": duration, "annotated": bool(annotate and box)}), 200
-
-    # build ffmpeg command
-    cmd = ["ffmpeg", "-y", "-ss", f"{start:.3f}", "-i", str(video_path), "-t", f"{duration:.3f}"]
-    draw = None
-    if annotate and box:
+        if meta_rec and meta_rec.get("box"):
+            b = meta_rec["box"]
+            if isinstance(b, list) and len(b) == 4:
+                box_str = ",".join(map(str, b))
+    draw_box = None
+    if annotate and box_str:
         try:
-            x1, y1, x2, y2 = [int(v) for v in box.split(",")]
-            w = max(1, x2 - x1)
-            h = max(1, y2 - y1)
-            draw = f"drawbox=x={x1}:y={y1}:w={w}:h={h}:color=red@0.8:thickness=4"
+            x1, y1, x2, y2 = [int(v) for v in box_str.split(",")]
+            draw_box = (x1, y1, x2, y2)
         except Exception:
-            draw = None
+            draw_box = None
 
-    if draw:
-        cmd += ["-vf", draw]
+    # Frame window (robust by frames)
+    window_frames = max(int(round(window * cap_fps)), 1)
+    start_frame = max(frame_idx - window_frames, 0)
+    end_frame = min(frame_idx + window_frames, max(total_frames - 1, 0))
+    if end_frame <= start_frame:
+        end_frame = min(start_frame + 1, max(total_frames - 1, 1))
 
-    # Re-encode (veryfast) for compatibility
-    cmd += ["-c:v", "libx264", "-preset", "veryfast", "-c:a", "aac", str(out_path)]
+    start_sec = start_frame / cap_fps
+    duration = max((end_frame - start_frame + 1) / cap_fps, 0.04)
 
-    if _ffmpeg_exists():
-        try:
-            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return jsonify({"url": f"/snippets/{out_path.name}", "start": start, "duration": duration, "annotated": bool(draw)}), 200
-        except Exception as e:
-            # fallback later
-            print(f"[WARN] ffmpeg failed: {e}")
+    # Cache keys
+    base_key = f"{Path(filename).stem}__f{frame_idx}__w{int(window)}__ann{1 if draw_box else 0}"
+    mp4_path = Path(SNIPPETS_FOLDER) / (base_key + ".mp4")
+    h264_path = Path(SNIPPETS_FOLDER) / (base_key + "_h264.mp4")
 
-    # Fallback (rare): just return error if ffmpeg unavailable/failed
-    return jsonify({"error": "Failed to create snippet (ffmpeg missing or failed)."}), 500
+    # If H.264 already exists, return it immediately
+    if h264_path.is_file() and h264_path.stat().st_size > 0:
+        cap.release()
+        return jsonify({"kind": "video", "url": f"/snippets/{h264_path.name}",
+                        "start": start_sec, "duration": duration, "annotated": bool(draw_box)}), 200
 
+    # If raw mp4 exists but no H.264 yet, try to ensure H.264 and return
+    if mp4_path.is_file() and mp4_path.stat().st_size > 0 and not h264_path.is_file():
+        out = ensure_h264(mp4_path)
+        cap.release()
+        return jsonify({"kind": "video", "url": f"/snippets/{out.name}",
+                        "start": start_sec, "duration": duration, "annotated": bool(draw_box)}), 200
+
+    # Otherwise, write raw MP4 with OpenCV first
+    if width <= 0 or height <= 0:
+        cap.release()
+        return jsonify({"error": "Invalid video dimensions"}), 500
+
+    writer = _open_writer_mp4(mp4_path, cap_fps, (width, height))
+    if writer is None:
+        cap.release()
+        return jsonify({"error": "Failed to initialize video writer"}), 500
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+    cur = start_frame
+    frames_written = 0
+    try:
+        while cur <= end_frame:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            if draw_box:
+                x1, y1, x2, y2 = draw_box
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+            writer.write(frame)
+            frames_written += 1
+            cur += 1
+    finally:
+        writer.release()
+        cap.release()
+
+    if not mp4_path.is_file() or mp4_path.stat().st_size == 0 or frames_written == 0:
+        return jsonify({"error": "Failed to create snippet (no frames)"}), 500
+
+    # Transcode to H.264 for browser playback
+    out = ensure_h264(mp4_path)
+    return jsonify({"kind": "video", "url": f"/snippets/{out.name}",
+                    "start": start_sec, "duration": duration, "annotated": bool(draw_box)}), 200
 
 # ----------------------------- Legacy / Misc ----------------------------- #
 

@@ -4,9 +4,10 @@ import "./MatchPage.css";
 
 /**
  * MatchPage
- * - Loads only best-per-person matches from /api/matches_feed?best_per_person=1
- * - Displays compact, separated cards in a 3-column responsive grid
- * - Each card shows: reference image, matched frame, details, delete button, and "Watch 10s clip"
+ * - Loads best-per-person matches from /api/matches_feed?best_per_person=1
+ * - 3-column responsive grid of compact cards
+ * - Each card shows: reference image, matched frame, meta, delete, and "Watch 10s clip"
+ * - Clip modal supports MP4 or GIF (server returns {kind: "video"|"gif", url: ...})
  */
 function MatchPage() {
   const [items, setItems] = useState([]);
@@ -16,6 +17,7 @@ function MatchPage() {
   // Clip modal
   const [clipOpen, setClipOpen] = useState(false);
   const [clipUrl, setClipUrl] = useState("");
+  const [clipKind, setClipKind] = useState("video"); // "video" | "gif"
   const [clipLoading, setClipLoading] = useState(false);
   const [clipErr, setClipErr] = useState("");
 
@@ -61,7 +63,9 @@ function MatchPage() {
     setClipErr("");
     setClipLoading(true);
     setClipUrl("");
+    setClipKind("video");
     setClipOpen(true);
+
     try {
       const params = new URLSearchParams({
         video: m.video || "",
@@ -69,7 +73,6 @@ function MatchPage() {
         window: "5",
         annotate: "1",
       });
-      // If fps/box exist in feed, send them to save a meta lookup
       if (typeof m.fps === "number") params.set("fps", String(m.fps));
       if (Array.isArray(m.box) && m.box.length === 4) params.set("box", m.box.join(","));
 
@@ -77,11 +80,15 @@ function MatchPage() {
       const ct = res.headers.get("content-type") || "";
       const isJson = ct.includes("application/json");
       const data = isJson ? await res.json() : await res.text();
+
       if (!res.ok) {
         setClipErr((isJson ? data.error : String(data)) || `HTTP ${res.status}`);
         return;
       }
-      setClipUrl(`http://localhost:5000${data.url}`);
+
+      const absolute = `http://localhost:5000${data.url}`;
+      setClipKind(data.kind || "video");
+      setClipUrl(absolute);
     } catch (err) {
       setClipErr(String(err.message || err));
     } finally {
@@ -102,7 +109,6 @@ function MatchPage() {
 
         {loading && <p>Loading…</p>}
         {msg && <p className="error">{msg}</p>}
-
         {!loading && items.length === 0 && <p>No matches yet.</p>}
 
         <div className="cards-grid">
@@ -160,7 +166,7 @@ function MatchPage() {
           })}
         </div>
 
-        {/* Simple modal for the 10s clip */}
+        {/* Clip modal */}
         {clipOpen && (
           <div
             style={{
@@ -183,10 +189,12 @@ function MatchPage() {
                 <h3 style={{ margin: 0 }}>🎬 10s clip</h3>
                 <button className="icon-btn" onClick={() => setClipOpen(false)}>✖</button>
               </div>
+
               <div style={{ marginTop: 10 }}>
                 {clipLoading && <p>Preparing clip…</p>}
                 {clipErr && <p className="error">{clipErr}</p>}
-                {clipUrl && (
+
+                {clipUrl && clipKind === "video" && (
                   <video
                     src={clipUrl}
                     controls
@@ -194,11 +202,18 @@ function MatchPage() {
                     style={{ width: "100%", borderRadius: 8, outline: "none" }}
                   />
                 )}
+
+                {clipUrl && clipKind === "gif" && (
+                  <img
+                    src={clipUrl}
+                    alt="snippet gif"
+                    style={{ width: "100%", borderRadius: 8, display: "block" }}
+                  />
+                )}
               </div>
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

@@ -4,7 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="2cafd2fb-7181-4290-961a-384c6e6b6bfd" name="Changes" comment="Added Readme" />
+    <list default="true" id="2cafd2fb-7181-4290-961a-384c6e6b6bfd" name="Changes" comment="Added Readme">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frame_store/video/meta.jsonl" beforeDir="false" afterPath="$PROJECT_DIR$/frame_store/video/meta.jsonl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/MatchPage.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/MatchPage.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/videos_database/video.mp4.json" beforeDir="false" afterPath="$PROJECT_DIR$/videos_database/video.mp4.json" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
