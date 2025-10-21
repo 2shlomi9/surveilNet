@@ -23,6 +23,7 @@ from typing import Optional
 import imageio.v2 as iio
 import subprocess, shutil
 import imageio_ffmpeg
+from datetime import datetime
 
 # Project models
 from models.face_database import FaceDatabase
@@ -48,6 +49,7 @@ CORS(
     allow_headers=["Content-Type"],
     supports_credentials=False,
 )
+
 
 # Always add CORS headers (also on errors)
 @app.after_request
@@ -121,6 +123,24 @@ signal.signal(signal.SIGINT, _handle_sigint)
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def _new_progress(filename: str):
+    return {
+        "filename": filename,
+        "frames_done": 0,
+        "frames_total": 0,
+        "percent": 0,
+        "done": False,
+        "canceled": False,
+        "error": None,
+        "started_at": datetime.utcnow().isoformat() + "Z",
+        "finished_at": None,
+    }
+
+def _set_progress(job_id: str, **kw):
+    with JOBS_LOCK:
+        pr = JOBS.get(job_id, {}).get("progress")
+        if pr is not None:
+            pr.update(kw)
 
 def append_matches_to_feed(person, matches: list) -> None:
     """
@@ -373,6 +393,9 @@ def upload_video():
 PROCESS_JOBS = {}  # job_id -> {"current": int, "total": int, "done": bool, "filename": str}
 PROCESS_LOCK = threading.Lock()
 
+# === Job manager (in-memory) ===
+JOBS = {}  # job_id -> {"thread": Thread, "stop": Event, "progress": {...}}
+JOBS_LOCK = threading.Lock()
 def make_progress_cb(job_id: str):
     def _cb(cur: int, total: int):
         with PROCESS_LOCK:
@@ -412,30 +435,59 @@ def _run_processing_job(job_id: str, filename: str, video_meta: dict):
 
 @app.route("/api/process_video_async", methods=["POST"])
 def process_video_async():
-    data = request.get_json()
-    if not data or "filename" not in data:
-        return jsonify({"error": "Filename is required in JSON body"}), 400
+    data = request.get_json() or {}
+    filename = secure_filename(data.get("filename", ""))
 
-    filename = secure_filename(data["filename"])
+    if not filename:
+        return jsonify({"error": "filename is required"}), 400
+
     video_path = os.path.join(VIDEO_FOLDER, filename)
     if not os.path.exists(video_path):
-        return jsonify({"error": f"Video file not found: {filename}"}), 404
+        return jsonify({"error": f"Video not found: {filename}"}), 404
 
-    meta_path = os.path.join(VIDEO_FOLDER, f"{filename}.json")
-    video_meta = {}
-    if os.path.exists(meta_path):
-        try:
-            with open(meta_path, "r", encoding="utf-8") as f:
-                video_meta = json.load(f)
-        except Exception:
-            video_meta = {}
-
+    # צור job חדש
     job_id = str(uuid.uuid4())
-    with PROCESS_LOCK:
-        PROCESS_JOBS[job_id] = {"current": 0, "total": 1, "done": False, "filename": filename}
+    stop_ev = threading.Event()
+    progress = _new_progress(filename)
 
-    t = threading.Thread(target=_run_processing_job, args=(job_id, filename, video_meta), daemon=True)
-    t.start()
+    def progress_cb(done, total):
+        pct = int((done / total) * 100) if total else 0
+        _set_progress(job_id, frames_done=done, frames_total=total, percent=pct)
+
+    def worker():
+        try:
+            # video_meta (אופציונלי)
+            meta_path = os.path.join(VIDEO_FOLDER, f"{filename}.json")
+            video_meta = {}
+            if os.path.exists(meta_path):
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as f:
+                        video_meta = json.load(f)
+                except Exception:
+                    video_meta = {}
+
+            matcher = FaceMatcher(face_db)
+            processor = VideoProcessor(
+                matcher=matcher,
+                output_folder=MATCHES_FOLDER,
+                frame_skip=5,
+                store_only=True,
+                video_meta=video_meta,
+                frame_store_root=FRAME_STORE_ROOT,
+                device=device,
+                stop_event=stop_ev,
+                progress_cb=progress_cb,
+            )
+
+            stats = processor.process_video(video_path)
+            _set_progress(job_id, done=True, percent=100, finished_at=datetime.utcnow().isoformat() + "Z")
+        except Exception as e:
+            _set_progress(job_id, error=str(e), done=True, finished_at=datetime.utcnow().isoformat() + "Z")
+
+    th = threading.Thread(target=worker, name=f"process-{filename}", daemon=True)
+    with JOBS_LOCK:
+        JOBS[job_id] = {"thread": th, "stop": stop_ev, "progress": progress}
+    th.start()
 
     return jsonify({"job_id": job_id}), 202
 
@@ -445,8 +497,8 @@ def process_status():
     if not job_id:
         return jsonify({"error": "job_id is required"}), 400
 
-    with PROCESS_LOCK:
-        job = PROCESS_JOBS.get(job_id)
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
         if not job:
             return jsonify({"error": "job not found"}), 404
         cur = int(job.get("current", 0))
@@ -462,6 +514,33 @@ def process_status():
         "done": done
     }), 200
 
+@app.route("/api/process_cancel", methods=["POST"])
+def process_cancel():
+    job_id = request.args.get("job_id", "")
+    if not job_id:
+        try:
+            body = request.get_json() or {}
+            job_id = body.get("job_id", "")
+        except Exception:
+            pass
+    if not job_id:
+        return jsonify({"error": "job_id is required"}), 400
+
+    with JOBS_LOCK:
+        job = JOBS.get(job_id)
+
+    if not job:
+        return jsonify({"error": "job not found"}), 404
+
+    # בקש מהעיבוד להיעצר
+    job["stop"].set()
+
+    # ננסה להצטרף ל־thread לזמן קצר (לא חוסם לנצח)
+    job["thread"].join(timeout=2.0)
+
+    _set_progress(job_id, canceled=True, done=True, finished_at=datetime.utcnow().isoformat() + "Z")
+
+    return jsonify({"message": "processing canceled", "job_id": job_id}), 200
 
 # ----------------------------- Matches / Feed ----------------------------- #
 
