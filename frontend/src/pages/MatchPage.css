@@ -1,15 +1,11 @@
-/* MatchPage.css */
-
-/* Whole page is a column layout that fills the viewport */
 .matches-page {
-  height: 100vh;             /* take full viewport height */
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: #0d1218;
   color: #eef2f7;
 }
 
-/* Sticky toolbar at top (inside the page), not the window */
 .matches-toolbar {
   position: sticky;
   top: 0;
@@ -24,14 +20,12 @@
 .matches-toolbar .right { display: flex; gap: 8px; }
 .matches-toolbar h2 { margin: 0; font-size: 18px; }
 
-/* Internal scroll area for the grid */
 .matches-scroll {
-  flex: 1;                   /* take remaining height */
-  overflow: auto;            /* our own scrollbar */
+  flex: 1;
+  overflow: auto;
   padding: 16px;
 }
 
-/* Optional: styled scrollbar (webkit/blink) */
 .matches-scroll::-webkit-scrollbar { width: 10px; }
 .matches-scroll::-webkit-scrollbar-track { background: #0f141b; }
 .matches-scroll::-webkit-scrollbar-thumb {
@@ -40,7 +34,6 @@
 }
 .matches-scroll::-webkit-scrollbar-thumb:hover { background: #3a4657; }
 
-/* Grid of cards */
 .matches-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -96,7 +89,6 @@
 .icon-btn.danger { border-color: #7b2c2c; color: #ffb3b3; }
 .icon-btn:hover { background: rgba(255,255,255,0.06); }
 
-/* Two-column media inside card */
 .mp-media {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -112,8 +104,8 @@
 .mp-media-tile img {
   width: 100%;
   height: 220px;
-  object-fit: contain;      /* prevent faces from being cropped */
-  background: #0b0f14;      /* letterbox */
+  object-fit: contain;
+  background: #0b0f14;
   border-radius: 10px;
   display: block;
 }
@@ -133,7 +125,6 @@
   color: #a8b5c9;
 }
 
-/* Meta info grid */
 .mp-meta {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -147,15 +138,34 @@
   display: grid;
   grid-template-rows: auto auto;
   gap: 4px;
+  overflow: hidden;
+}
+.kv span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+}
+.kv span:hover::after {
+  content: attr(title);
+  position: absolute;
+  background: #2b3441;
+  color: #e7edf6;
+  padding: 4px 8px;
+  border-radius: 4px;
+  z-index: 10;
+  white-space: normal;
+  max-width: 200px;
+  left: 0;
+  top: 100%;
+  margin-top: 4px;
 }
 .kv span:first-child { font-size: 11px; color: #9fb0c7; }
 .kv span:last-child  { font-weight: 700; color: #e7edf6; }
 
-/* Helper texts */
 .hint { opacity: 0.75; }
 .error { color: #ffb3b3; }
 
-/* Modal (re-used) */
 .mp-modal {
   position: fixed;
   inset: 0;
@@ -179,7 +189,6 @@
   align-items: center;
 }
 
-/* Responsive */
 @media (max-width: 1200px) {
   .matches-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -187,35 +196,4 @@
   .matches-grid { grid-template-columns: 1fr; }
   .mp-media     { grid-template-columns: 1fr; }
   .mp-meta      { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-.mp-meta {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-  max-height: 150px; 
-  overflow-y: auto;
-  padding-right: 4px; 
-}
-
-.mp-meta::-webkit-scrollbar {
-  width: 6px;
-}
-.mp-meta::-webkit-scrollbar-track {
-  background: #0f141b;
-}
-.mp-meta::-webkit-scrollbar-thumb {
-  background: #2b3441;
-  border-radius: 8px;
-}
-.mp-meta::-webkit-scrollbar-thumb:hover {
-  background: #3a4657;
-}
-
-@media (max-width: 720px) {
-  .matches-grid { grid-template-columns: 1fr; }
-  .mp-media     { grid-template-columns: 1fr; }
-  .mp-meta      {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    max-height: 100px; 
-  }
 }

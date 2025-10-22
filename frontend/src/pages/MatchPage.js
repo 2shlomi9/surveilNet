@@ -41,11 +41,11 @@ function MatchCard({ item, onDelete, onWatch }) {
       </div>
 
       <div className="mp-meta">
-        <div className="kv"><span>Score</span><span>{score ?? "—"}</span></div>
-        <div className="kv"><span>Place</span><span>{item.place || "—"}</span></div>
-        <div className="kv"><span>Time</span><span>{item.time || "—"}</span></div>
-        <div className="kv"><span>Video</span><span>{item.video || "—"}</span></div>
-        <div className="kv"><span>Frame</span><span>{item.frame_idx ?? "—"}</span></div>
+        <div className="kv"><span title="Score">Score</span><span title={score ?? "—"}>{score ?? "—"}</span></div>
+        <div className="kv"><span title="Place">Place</span><span title={item.place || "—"}>{item.place || "—"}</span></div>
+        <div className="kv"><span title="Time">Time</span><span title={item.time || "—"}>{item.time || "—"}</span></div>
+        <div className="kv"><span title="Video">Video</span><span title={item.video || "—"}>{item.video || "—"}</span></div>
+        <div className="kv"><span title="Frame">Frame</span><span title={String(item.frame_idx ?? "—")}>{item.frame_idx ?? "—"}</span></div>
       </div>
     </div>
   );
@@ -62,7 +62,6 @@ export default function MatchPage() {
   const [clipErr, setClipErr] = useState("");
   const scrollRef = useRef(null);
 
-  // Lock body scroll only on this page
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -161,7 +160,6 @@ export default function MatchPage() {
         </div>
       </div>
 
-      {/* Clip modal */}
       {clipOpen && (
         <div className="mp-modal" onClick={() => setClipOpen(false)}>
           <div className="mp-modal-inn" onClick={(e) => e.stopPropagation()}>
