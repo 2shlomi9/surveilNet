@@ -188,3 +188,34 @@
   .mp-media     { grid-template-columns: 1fr; }
   .mp-meta      { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+.mp-meta {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 150px; 
+  overflow-y: auto;
+  padding-right: 4px; 
+}
+
+.mp-meta::-webkit-scrollbar {
+  width: 6px;
+}
+.mp-meta::-webkit-scrollbar-track {
+  background: #0f141b;
+}
+.mp-meta::-webkit-scrollbar-thumb {
+  background: #2b3441;
+  border-radius: 8px;
+}
+.mp-meta::-webkit-scrollbar-thumb:hover {
+  background: #3a4657;
+}
+
+@media (max-width: 720px) {
+  .matches-grid { grid-template-columns: 1fr; }
+  .mp-media     { grid-template-columns: 1fr; }
+  .mp-meta      {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    max-height: 100px; 
+  }
+}
