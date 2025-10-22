@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import "./MatchPage.css";
+import VideoSnippetPlayer from "../components/VideoSnippetPlayer";
 
 function MatchCard({ item, onDelete, onWatch }) {
   const score = typeof item.score === "number" ? item.score.toFixed(3) : item.score;
@@ -55,11 +56,18 @@ export default function MatchPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+
+  // Modal state
   const [clipOpen, setClipOpen] = useState(false);
   const [clipUrl, setClipUrl] = useState("");
   const [clipKind, setClipKind] = useState("video");
   const [clipLoading, setClipLoading] = useState(false);
   const [clipErr, setClipErr] = useState("");
+
+  // Overlay meta for VideoSnippetPlayer
+  const [overlayMeta, setOverlayMeta] = useState(null);
+  // overlayMeta = { personId, videoName, startFrame, endFrame, fps }
+
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -99,27 +107,61 @@ export default function MatchPage() {
   };
 
   const handleWatch = async (item) => {
+    // Open modal and prepare snippet + overlay config
     setClipOpen(true);
     setClipLoading(true);
     setClipUrl("");
     setClipErr("");
     setClipKind("video");
+    setOverlayMeta(null);
+
     try {
+      // 1) Request snippet video from the server
       const params = new URLSearchParams({
         video: item.video || "",
         frame_idx: String(item.frame_idx ?? ""),
         window: "5",
-        annotate: "1",
+        annotate: "0", // the overlay (box) is drawn client-side via canvas
       });
       if (typeof item.fps === "number") params.set("fps", String(item.fps));
-      if (Array.isArray(item.box) && item.box.length === 4) params.set("box", item.box.join(","));
+
       const res = await fetch(`http://localhost:5000/api/video_snippet?${params.toString()}`);
       const ct = res.headers.get("content-type") || "";
       const isJson = ct.includes("application/json");
       const payload = isJson ? await res.json() : await res.text();
       if (!res.ok) throw new Error((isJson ? payload.error : String(payload)) || `HTTP ${res.status}`);
-      setClipKind(payload.kind || "video");
-      setClipUrl(`http://localhost:5000${payload.url}`);
+
+      // Expect at least { url, kind }
+      const kind = payload.kind || "video";
+      const url = `http://localhost:5000${payload.url}`;
+      setClipKind(kind);
+      setClipUrl(url);
+
+      // 2) Compute overlay window and fps
+      let fps = 25;
+      if (typeof payload.fps === "number") fps = payload.fps;
+      else if (typeof item.fps === "number") fps = item.fps;
+
+      let startFrame, endFrame;
+      if (typeof payload.start_idx === "number" && typeof payload.end_idx === "number") {
+        startFrame = payload.start_idx;
+        endFrame = payload.end_idx;
+      } else {
+        const windowSec = 5;
+        const windowFrames = Math.round(windowSec * fps);
+        const center = Number(item.frame_idx || 0);
+        startFrame = Math.max(0, center - windowFrames);
+        endFrame = center + windowFrames;
+      }
+
+      // 3) Provide meta for the overlay component
+      setOverlayMeta({
+        personId: item.person_id,     // should be present in the feed
+        videoName: item.video,
+        startFrame,
+        endFrame,
+        fps,
+      });
     } catch (e) {
       setClipErr(String(e.message || e));
     } finally {
@@ -139,7 +181,7 @@ export default function MatchPage() {
         </div>
         <div className="right">
           <button className="btn secondary" onClick={load} disabled={loading}>⟳ Refresh</button>
-          <button className="btn secondary" onClick={scrollTop}>⬆ Back to top</button>
+        <button className="btn secondary" onClick={scrollTop}>⬆ Back to top</button>
           <Link to="/"><button className="btn secondary">⬅ Back</button></Link>
         </div>
       </div>
@@ -170,9 +212,20 @@ export default function MatchPage() {
             <div style={{ marginTop: 10 }}>
               {clipLoading && <p>Preparing clip…</p>}
               {clipErr && <p className="error">{clipErr}</p>}
-              {clipUrl && clipKind === "video" && (
-                <video src={clipUrl} controls autoPlay style={{ width: "100%", borderRadius: 8 }} />
+
+              {clipUrl && clipKind === "video" && overlayMeta && (
+                <VideoSnippetPlayer
+                  src={clipUrl}
+                  personId={overlayMeta.personId}
+                  videoName={overlayMeta.videoName}
+                  startFrame={overlayMeta.startFrame}
+                  endFrame={overlayMeta.endFrame}
+                  fps={overlayMeta.fps}
+                  // threshold={0.65} // optional: pass a custom threshold if needed
+                  style={{ width: "100%" }}
+                />
               )}
+
               {clipUrl && clipKind === "gif" && (
                 <img src={clipUrl} alt="snippet gif" style={{ width: "100%", borderRadius: 8 }} />
               )}

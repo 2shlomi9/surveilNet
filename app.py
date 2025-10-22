@@ -24,6 +24,7 @@ import imageio.v2 as iio
 import subprocess, shutil
 import imageio_ffmpeg
 from datetime import datetime
+import numpy as np
 
 # Project models
 from models.face_database import FaceDatabase
@@ -607,6 +608,176 @@ def delete_match_from_feed(match_id):
         return jsonify({"error": "Match not found"}), 404
     return jsonify({"message": f"Deleted {removed} match item", "deleted": removed}), 200
 
+def _person_mean_embedding(person):
+    """
+    Return a single embedding vector (np.ndarray, L2-normalized) for the person:
+    prefer person.mean_embedding if exists; otherwise average over person.embeddings.
+    Return None if missing.
+    """
+    vec = None
+    try:
+        if getattr(person, "mean_embedding", None) is not None:
+            vec = np.array(person.mean_embedding, dtype=np.float32)
+        elif getattr(person, "embeddings", None):
+            arrs = [np.array(e, dtype=np.float32) for e in person.embeddings if e is not None]
+            if arrs:
+                vec = np.mean(arrs, axis=0).astype(np.float32)
+        if vec is None:
+            return None
+        # L2 normalize
+        n = np.linalg.norm(vec)
+        if n > 0:
+            vec = vec / n
+        return vec
+    except Exception:
+        return None
+
+
+def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
+    denom = (np.linalg.norm(a) * np.linalg.norm(b))
+    if denom == 0:
+        return 0.0
+    return float(np.dot(a, b) / denom)
+
+
+@app.route("/api/match_boxes", methods=["GET"])
+def api_match_boxes():
+    """
+    Return the best (highest-score) face box per frame within [start_idx, end_idx] for a given person & video.
+    Query params:
+      - person_id (required)
+      - video (required)  # the video file name used in frame_store/<video_name_noext>
+      - start_idx (required, int)
+      - end_idx   (required, int)  # inclusive
+      - threshold (optional, float; default 0.60)
+    Response:
+    {
+      "video": "...",
+      "fps": <float|None>,
+      "frame_w": <int|None>,
+      "frame_h": <int|None>,
+      "boxes": [
+        {"frame_idx": i, "box": [x, y, w, h], "score": 0.82}
+      ]
+    }
+    Notes:
+    - Picks at most ONE box per frame: the detection whose cosine vs person is maximal and >= threshold.
+    - Uses embeddings and boxes saved by the store-only pipeline in frame_store/<video_noext>/meta.jsonl
+    """
+    try:
+        person_id = request.args.get("person_id", "").strip()
+        video_name = request.args.get("video", "").strip()
+        start_idx = int(request.args.get("start_idx", "-1"))
+        end_idx   = int(request.args.get("end_idx", "-1"))
+        threshold = float(request.args.get("threshold", "0.60"))
+
+        if not person_id or not video_name or start_idx < 0 or end_idx < 0:
+            return jsonify({"error": "person_id, video, start_idx, end_idx are required"}), 400
+        if end_idx < start_idx:
+            return jsonify({"error": "end_idx must be >= start_idx"}), 400
+
+        # find the person in memory
+        person = None
+        for p in face_db.people:
+            if p.id == person_id:
+                person = p
+                break
+        if person is None:
+            return jsonify({"error": "person not found"}), 404
+
+        pvec = _person_mean_embedding(person)
+        if pvec is None:
+            return jsonify({"error": "person has no embeddings"}), 400
+
+        # derive frame_store path
+        video_noext = os.path.splitext(video_name)[0]
+        root_dir = Path(FRAME_STORE_ROOT) / video_noext
+        meta_path = root_dir / "meta.jsonl"
+        if not meta_path.is_file():
+            return jsonify({"error": "meta.jsonl not found for video"}), 404
+
+        # optional global info (fps, frame size) – if saved in the first line; else fallback to None
+        fps_val = None
+        frame_w = None
+        frame_h = None
+
+        best_per_frame = {}  # frame_idx -> {"box":[x,y,w,h], "score":float}
+
+        with open(meta_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    rec = json.loads(line)
+                except Exception:
+                    continue
+
+                fi = rec.get("frame_idx")
+                if fi is None:
+                    continue
+                if fi < start_idx or fi > end_idx:
+                    continue
+
+                embed_path = rec.get("embed_path")
+                if not embed_path or not os.path.exists(embed_path):
+                    continue
+
+                # load embedding for this detection
+                try:
+                    emb = np.load(embed_path).astype(np.float32)
+                except Exception:
+                    continue
+
+                # cosine vs person
+                score = _cosine_sim(emb, pvec)
+                if score < threshold:
+                    # below threshold → ignore this detection for the frame
+                    continue
+
+                # track the best candidate in this frame
+                cur = best_per_frame.get(fi)
+                if (cur is None) or (score > cur["score"]):
+                    # ensure we provide a box; if missing, skip
+                    box = rec.get("box")
+                    if not box or not isinstance(box, (list, tuple)) or len(box) != 4:
+                        continue
+                    best_per_frame[fi] = {
+                        "box": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+                        "score": float(score)
+                    }
+
+                # collect optional globals if present
+                if fps_val is None and rec.get("fps") is not None:
+                    try:
+                        fps_val = float(rec.get("fps"))
+                    except Exception:
+                        fps_val = None
+                if frame_w is None and rec.get("frame_w") is not None:
+                    try:
+                        frame_w = int(rec.get("frame_w"))
+                    except Exception:
+                        frame_w = None
+                if frame_h is None and rec.get("frame_h") is not None:
+                    try:
+                        frame_h = int(rec.get("frame_h"))
+                    except Exception:
+                        frame_h = None
+
+        # pack results sorted by frame_idx
+        boxes = []
+        for fi in range(start_idx, end_idx + 1):
+            if fi in best_per_frame:
+                entry = best_per_frame[fi]
+                boxes.append({"frame_idx": fi, "box": entry["box"], "score": entry["score"]})
+
+        return jsonify({
+            "video": video_name,
+            "fps": fps_val,
+            "frame_w": frame_w,
+            "frame_h": frame_h,
+            "boxes": boxes
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ----------------------------- frame_store & snippets serving ----------------------------- #
 
