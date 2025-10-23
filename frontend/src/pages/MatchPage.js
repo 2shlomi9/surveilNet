@@ -117,10 +117,11 @@ export default function MatchPage() {
 
     try {
       // 1) Request snippet video from the server
+      const CLIP_WINDOW_SEC = 10;
       const params = new URLSearchParams({
         video: item.video || "",
         frame_idx: String(item.frame_idx ?? ""),
-        window: "5",
+        window: String(CLIP_WINDOW_SEC),
         annotate: "0", // the overlay (box) is drawn client-side via canvas
       });
       if (typeof item.fps === "number") params.set("fps", String(item.fps));
@@ -147,7 +148,7 @@ export default function MatchPage() {
         startFrame = payload.start_idx;
         endFrame = payload.end_idx;
       } else {
-        const windowSec = 5;
+        const windowSec = CLIP_WINDOW_SEC;
         const windowFrames = Math.round(windowSec * fps);
         const center = Number(item.frame_idx || 0);
         startFrame = Math.max(0, center - windowFrames);

@@ -111,10 +111,11 @@ function AddPerson() {
     setOverlayMeta(null);
 
     try {
+      const CLIP_WINDOW_SEC = 10;
       const params = new URLSearchParams({
         video: best.video || "",
         frame_idx: String(best.frame_idx ?? ""),
-        window: "5",
+        window: String(CLIP_WINDOW_SEC),
         annotate: "0", // overlay is drawn client-side by VideoSnippetPlayer
       });
       if (typeof best.fps === "number") params.set("fps", String(best.fps));
@@ -143,7 +144,7 @@ function AddPerson() {
         startFrame = payload.start_idx;
         endFrame = payload.end_idx;
       } else {
-        const windowSec = 5;
+        const windowSec = CLIP_WINDOW_SEC;
         const windowFrames = Math.round(windowSec * fps);
         const center = Number(best.frame_idx || 0);
         startFrame = Math.max(0, center - windowFrames);
