@@ -33,7 +33,7 @@ export default function VideoSnippetPlayer({
   const [boxesMap, setBoxesMap] = useState(new Map());
   const [metaSize, setMetaSize] = useState({ frame_w: null, frame_h: null, fps_meta: null });
 
-  // Sticky state
+  // Sticky state: keep last valid box until the next valid one appears
   const lastBoxRef = useRef(null);   // { box:[x,y,w,h], score:number }
   const lastIdxRef = useRef(null);   // frame_idx
 
@@ -93,7 +93,7 @@ export default function VideoSnippetPlayer({
     canvas.height = Math.max(1, Math.round(rect.height));
   }
 
-  // Compute scale + offset to account for letterbox ("contain" behavior)
+  // Compute scale + offset for letterbox (video element keeps aspect ratio)
   function computeLetterboxTransform() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -113,7 +113,7 @@ export default function VideoSnippetPlayer({
     return { sx: scale, sy: scale, ox, oy };
   }
 
-  // Draw one frame's overlay (with sticky box)
+  // Draw one frame overlay (with sticky fallback)
   function drawOverlay() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -124,15 +124,15 @@ export default function VideoSnippetPlayer({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // current index in original video
+    // Current frame index in the original video
     const currentTime = video.currentTime || 0;
     const curOffsetFrames = Math.floor(currentTime * fps);
     const curFrameIdx = startFrame + curOffsetFrames;
 
-    // box for current frame
+    // Box for the current frame
     const found = boxesMap.get(curFrameIdx);
 
-    // Sticky: if none for this frame, use last
+    // Sticky behavior
     let toDraw = null;
     if (found) {
       lastBoxRef.current = found;
@@ -145,8 +145,6 @@ export default function VideoSnippetPlayer({
     if (!toDraw) return;
 
     const [x, y, w, h] = toDraw.box;
-
-    // letterboxing transform
     const { sx, sy, ox, oy } = computeLetterboxTransform();
 
     const rx = x * sx + ox;

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "./AddPerson.css";
+import VideoSnippetPlayer from "../components/VideoSnippetPlayer";
 
 function AddPerson() {
   const [firstName, setFirstName] = useState("");
@@ -12,6 +13,9 @@ function AddPerson() {
   const [message, setMessage]     = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Person id returned from backend on save (used for overlay fetch)
+  const [personId, setPersonId] = useState(null);
+
   // Best match returned by backend on save (or null)
   const [best, setBest] = useState(null);
   const [notFound, setNotFound] = useState(false);  // “no match found” flag
@@ -22,6 +26,10 @@ function AddPerson() {
   const [clipKind, setClipKind] = useState("video");
   const [clipLoading, setClipLoading] = useState(false);
   const [clipErr, setClipErr] = useState("");
+
+  // Overlay meta for VideoSnippetPlayer
+  // { personId, videoName, startFrame, endFrame, fps }
+  const [overlayMeta, setOverlayMeta] = useState(null);
 
   // handle files
   const onFiles = (e) => {
@@ -59,6 +67,7 @@ function AddPerson() {
     setSubmitting(true);
     setBest(null);
     setNotFound(false);
+    setPersonId(null);
 
     try {
       const form = new FormData();
@@ -79,6 +88,8 @@ function AddPerson() {
       }
 
       setMessage(data.message || "Person added");
+      setPersonId(data.id || null);
+
       const lastSeen = data.last_seen || null;
       setBest(lastSeen);
       setNotFound(!lastSeen);
@@ -89,7 +100,7 @@ function AddPerson() {
     }
   };
 
-  // open 10s clip for current best
+  // open 10s clip for current best WITH moving overlay (no server-side annotation)
   const openClip = async () => {
     if (!best) return;
     setClipErr("");
@@ -97,16 +108,16 @@ function AddPerson() {
     setClipUrl("");
     setClipKind("video");
     setClipOpen(true);
+    setOverlayMeta(null);
 
     try {
       const params = new URLSearchParams({
         video: best.video || "",
         frame_idx: String(best.frame_idx ?? ""),
         window: "5",
-        annotate: "1",
+        annotate: "0", // overlay is drawn client-side by VideoSnippetPlayer
       });
       if (typeof best.fps === "number") params.set("fps", String(best.fps));
-      if (Array.isArray(best.box) && best.box.length === 4) params.set("box", best.box.join(","));
 
       const res = await fetch(`http://localhost:5000/api/video_snippet?${params.toString()}`);
       const ct = res.headers.get("content-type") || "";
@@ -121,6 +132,36 @@ function AddPerson() {
       const absolute = `http://localhost:5000${payload.url}`;
       setClipKind(payload.kind || "video");
       setClipUrl(absolute);
+
+      // Compute overlay window and fps for VideoSnippetPlayer
+      let fps = 25;
+      if (typeof payload.fps === "number") fps = payload.fps;
+      else if (typeof best.fps === "number") fps = best.fps;
+
+      let startFrame, endFrame;
+      if (typeof payload.start_idx === "number" && typeof payload.end_idx === "number") {
+        startFrame = payload.start_idx;
+        endFrame = payload.end_idx;
+      } else {
+        const windowSec = 5;
+        const windowFrames = Math.round(windowSec * fps);
+        const center = Number(best.frame_idx || 0);
+        startFrame = Math.max(0, center - windowFrames);
+        endFrame = center + windowFrames;
+      }
+
+      if (!personId) {
+        setClipErr("Missing person id for overlay.");
+        return;
+      }
+
+      setOverlayMeta({
+        personId,
+        videoName: best.video,
+        startFrame,
+        endFrame,
+        fps,
+      });
     } catch (err) {
       setClipErr(String(err.message || err));
     } finally {
@@ -235,9 +276,22 @@ function AddPerson() {
             <div style={{ marginTop: 10 }}>
               {clipLoading && <p>Preparing clip…</p>}
               {clipErr && <p className="error">{clipErr}</p>}
-              {clipUrl && clipKind === "video" && (
-                <video src={clipUrl} controls autoPlay style={{ width: "100%", borderRadius: 8 }} />
+
+              {/* Use the same overlay player as MatchPage */}
+              {clipUrl && clipKind === "video" && overlayMeta && (
+                <VideoSnippetPlayer
+                  src={clipUrl}
+                  personId={overlayMeta.personId}
+                  videoName={overlayMeta.videoName}
+                  startFrame={overlayMeta.startFrame}
+                  endFrame={overlayMeta.endFrame}
+                  fps={overlayMeta.fps}
+                  // threshold={0.65} // optional override
+                  style={{ width: "100%" }}
+                />
               )}
+
+              {/* Fallbacks (rare) */}
               {clipUrl && clipKind === "gif" && (
                 <img src={clipUrl} alt="snippet gif" style={{ width: "100%", borderRadius: 8 }} />
               )}
