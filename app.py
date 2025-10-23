@@ -502,17 +502,30 @@ def process_status():
         job = JOBS.get(job_id)
         if not job:
             return jsonify({"error": "job not found"}), 404
-        cur = int(job.get("current", 0))
-        total = max(int(job.get("total", 1)), 1)
-        done = bool(job.get("done", False))
-        percent = int(round(min(cur, total) * 100 / total))
+        pr = job.get("progress") or {}
+
+        # values come from _set_progress(...) in process_video_async.worker
+        frames_done  = int(pr.get("frames_done", 0))
+        frames_total = int(pr.get("frames_total", 0))
+        if frames_total <= 0:
+            frames_total = max(frames_done, 1)
+
+        percent = int(max(0, min(100, pr.get("percent", 0))))
+        done    = bool(pr.get("done", False))
+        canceled = bool(pr.get("canceled", False))
+        filename = pr.get("filename") or job.get("filename")
 
     return jsonify({
-        "filename": job.get("filename"),
-        "current": cur,
-        "total": total,
+        "job_id": job_id,
+        "filename": filename,
+        "current": frames_done,
+        "total": frames_total,
         "percent": percent,
-        "done": done
+        "done": done,
+        "canceled": canceled,
+        "error": pr.get("error"),
+        "started_at": pr.get("started_at"),
+        "finished_at": pr.get("finished_at"),
     }), 200
 
 @app.route("/api/process_cancel", methods=["POST"])

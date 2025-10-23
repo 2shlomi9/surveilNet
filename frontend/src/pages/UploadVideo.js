@@ -2,9 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 /**
- * UploadVideo with server-side processing progress + Cancel in both phases
- * - Upload phase: Cancel aborts XHR and removes partial file on server.
- * - Processing phase: Tries /api/process_cancel?job_id=... (if exists), otherwise stops polling gracefully.
+ * UploadVideo (async processing with progress + cancel)
+ *
+ * Flow:
+ *  1) Upload file to /api/upload_video (cancelable via xhr.abort()).
+ *  2) Start async processing via /api/process_video_async -> returns {job_id}.
+ *  3) Poll /api/process_status?job_id=... every 500ms and update the bar.
+ *  4) Optional: Cancel processing via /api/process_cancel (best-effort).
+ *
+ * Notes:
+ *  - Progress polling is tolerant to different server field names/types.
+ *  - The "Cancel Upload" button remains visible while the XHR is in flight.
+ *  - The "Cancel Processing" button appears during server-side processing.
  */
 function UploadVideo() {
   const [video, setVideo] = useState(null);
@@ -15,18 +24,19 @@ function UploadVideo() {
   const [startTime, setStartTime] = useState("");
   const [location, setLocation] = useState("");
 
-  // Processing progress
+  // Async-processing progress state
   const [jobId, setJobId] = useState(null);
   const [progress, setProgress] = useState(0);
 
   // Cancel handles
-  const uploadXhrRef = useRef(null);  // holds the xhr during upload
+  const cancelUploadRef = useRef(null);
   const canceledRef = useRef(false);
 
   // Polling handle
   const pollRef = useRef(null);
 
   useEffect(() => {
+    // Cleanup polling on unmount
     return () => {
       if (pollRef.current) {
         clearInterval(pollRef.current);
@@ -35,7 +45,7 @@ function UploadVideo() {
     };
   }, []);
 
-  const uploadWithCancel = (file, meta, xhrRef) =>
+  const uploadWithCancel = (file, meta, onCancelRef) =>
     new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "http://localhost:5000/api/upload_video");
@@ -44,7 +54,11 @@ function UploadVideo() {
         const status = xhr.status;
         const text = xhr.responseText || "{}";
         let resp = {};
-        try { resp = JSON.parse(text); } catch {}
+        try {
+          resp = JSON.parse(text);
+        } catch {
+          // ignore parse error; treat as generic HTTP failure below
+        }
         if (status >= 200 && status < 300) return resolve(resp);
         if (status === 499) return reject(new Error("Upload canceled by user"));
         return reject(new Error(resp.error || `HTTP ${status}`));
@@ -58,46 +72,69 @@ function UploadVideo() {
       formData.append("start_time", meta.start_time);
       formData.append("location", meta.location);
 
-      xhrRef.current = xhr;     // keep xhr so we can abort later
       xhr.send(formData);
+      onCancelRef.current = () => xhr.abort();
     });
 
   const startAsyncProcess = async (filename) => {
+    // Start server-side processing
     const res = await fetch("http://localhost:5000/api/process_video_async", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Failed to start processing");
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to start processing");
+    }
 
     setJobId(data.job_id);
     setProgress(0);
     setProcessing(true);
     setMessage("Processing video…");
 
+    // Poll every 500ms (tolerant to different server field names/types)
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
         const st = await fetch(
-          `http://localhost:5000/api/process_status?job_id=${encodeURIComponent(data.job_id)}`
+          `http://localhost:5000/api/process_status?job_id=${encodeURIComponent(
+            data.job_id
+          )}`
         );
         const sd = await st.json();
-        if (st.ok) {
-          const pct = typeof sd.percent === "number" ? sd.percent : 0;
-          setProgress(pct);
-          if (sd.done) {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
-            setProgress(100);
-            setProcessing(false);
-            setMessage(`Success: processing complete (${sd.filename || filename})`);
-          }
-        } else {
+
+        if (!st.ok) {
           clearInterval(pollRef.current);
           pollRef.current = null;
           setProcessing(false);
           setMessage(sd.error || "Failed to read progress");
+          return;
+        }
+
+        // Accept percent/progress/pct/percentage and number/string
+        const rawPct =
+          sd.percent ?? sd.progress ?? sd.pct ?? sd.percentage ?? 0;
+        const pct = Math.max(0, Math.min(100, Number(rawPct) || 0));
+        setProgress(pct);
+
+        // Accept done/finished/status=done or percent>=100
+        const status = (sd.status || "").toString().toLowerCase();
+        const done =
+          sd.done === true ||
+          sd.finished === true ||
+          status === "done" ||
+          status === "finished" ||
+          pct >= 100;
+
+        if (done) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setProgress(100);
+          setProcessing(false);
+          setMessage(
+            `Success: processing complete (${sd.filename || filename})`
+          );
         }
       } catch (err) {
         clearInterval(pollRef.current);
@@ -111,8 +148,14 @@ function UploadVideo() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!video) { setMessage("Please select a video"); return; }
-    if (!startTime || !location) { setMessage("Please fill required fields: start time and location"); return; }
+    if (!video) {
+      setMessage("Please select a video");
+      return;
+    }
+    if (!startTime || !location) {
+      setMessage("Please fill required fields: start time and location");
+      return;
+    }
 
     canceledRef.current = false;
     setMessage("Uploading video…");
@@ -122,21 +165,17 @@ function UploadVideo() {
     setProgress(0);
 
     try {
-      // 1) Upload (with cancel support)
+      // 1) Upload (cancelable)
       const uploadData = await uploadWithCancel(
         video,
         { start_time: new Date(startTime).toISOString(), location },
-        uploadXhrRef
+        cancelUploadRef
       );
 
       if (canceledRef.current) {
         setMessage("Upload canceled by user");
         return;
       }
-
-      // Upload finished -> hide "cancel upload" state now
-      setIsUploading(false);
-      uploadXhrRef.current = null;
 
       // 2) Start async processing and show progress bar
       await startAsyncProcess(uploadData.filename);
@@ -149,48 +188,44 @@ function UploadVideo() {
       } else {
         setMessage(`Error: ${err.message}`);
       }
+    } finally {
       setIsUploading(false);
-      uploadXhrRef.current = null;
+      cancelUploadRef.current = null;
     }
   };
 
-  // Cancel behavior:
-  // - If currently uploading: abort XHR.
-  // - Else if currently processing: try server-side cancel (if endpoint exists), otherwise stop polling gracefully.
-  const handleCancel = async () => {
-    if (isUploading && uploadXhrRef.current) {
-      try { uploadXhrRef.current.abort(); } catch {}
-      setIsUploading(false);
+  const handleCancelUpload = () => {
+    // Abort the XHR immediately
+    canceledRef.current = true;
+    cancelUploadRef.current?.();
+    setIsUploading(false);
+    setProcessing(false);
+    setJobId(null);
+    setProgress(0);
+    setMessage("Upload canceled by user");
+  };
+
+  const handleCancelProcessing = async () => {
+    // Best-effort cancel on the server
+    try {
+      if (jobId) {
+        await fetch("http://localhost:5000/api/process_cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job_id: jobId }),
+        });
+      }
+    } catch {
+      // ignore network errors on cancel
+    } finally {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
       setProcessing(false);
       setJobId(null);
       setProgress(0);
-      setMessage("Upload canceled by user");
-      uploadXhrRef.current = null;
-      return;
-    }
-
-    if (processing && jobId) {
-      // Try to cancel processing on server (optional endpoint)
-      try {
-        const res = await fetch(
-          `http://localhost:5000/api/process_cancel?job_id=${encodeURIComponent(jobId)}`,
-          { method: "POST" }
-        );
-        // Even אם אין endpoint, ניפול חינני ללוגיקה למטה
-        if (res.ok) {
-          setMessage("Processing canceled");
-        } else {
-          const data = await res.json().catch(() => ({}));
-          setMessage(data.error || "Cancel request sent (server did not confirm)");
-        }
-      } catch {
-        setMessage("Cancel request sent (client stopped polling)");
-      } finally {
-        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-        setProcessing(false);
-        setJobId(null);
-        setProgress(0);
-      }
+      setMessage("Processing canceled by user");
     }
   };
 
@@ -201,9 +236,16 @@ function UploadVideo() {
 
         <form
           onSubmit={handleSubmit}
-          style={{ gap: 16, display: "flex", flexDirection: "column", alignItems: "stretch" }}
+          style={{
+            gap: 16,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "stretch",
+          }}
         >
-          <label style={{ textAlign: "left", fontWeight: 600 }}>Start Time (required):</label>
+          <label style={{ textAlign: "left", fontWeight: 600 }}>
+            Start Time (required):
+          </label>
           <input
             type="datetime-local"
             value={startTime}
@@ -211,7 +253,9 @@ function UploadVideo() {
             required
           />
 
-          <label style={{ textAlign: "left", fontWeight: 600 }}>Location (required):</label>
+          <label style={{ textAlign: "left", fontWeight: 600 }}>
+            Location (required):
+          </label>
           <input
             type="text"
             placeholder="e.g., Main Gate / North Entrance"
@@ -227,14 +271,37 @@ function UploadVideo() {
           />
 
           <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-            <button type="submit" className="btn" disabled={processing || isUploading}>
-              {processing ? "Processing..." : isUploading ? "Uploading…" : "Upload & Process"}
+            <button
+              type="submit"
+              className="btn"
+              disabled={processing || isUploading}
+            >
+              {processing
+                ? "Processing..."
+                : isUploading
+                ? "Uploading…"
+                : "Upload & Process"}
             </button>
 
-            {/* Keep cancel visible both when uploading and when processing */}
-            {(isUploading || processing) && (
-              <button type="button" className="btn secondary" onClick={handleCancel}>
-                ✋ {isUploading ? "Cancel Upload" : "Cancel Processing"}
+            {/* Show cancel button during upload */}
+            {isUploading && (
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={handleCancelUpload}
+              >
+                ✋ Cancel Upload
+              </button>
+            )}
+
+            {/* Show cancel button during processing */}
+            {processing && jobId && (
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={handleCancelProcessing}
+              >
+                🖐 Cancel Processing
               </button>
             )}
           </div>
@@ -249,7 +316,7 @@ function UploadVideo() {
                 borderRadius: 8,
                 background: "rgba(255,255,255,0.15)",
                 overflow: "hidden",
-                width: 420,
+                width: 520,
                 maxWidth: "100%",
                 margin: "0 auto",
               }}
@@ -269,7 +336,9 @@ function UploadVideo() {
 
         {message && <p style={{ marginTop: 10 }}>{message}</p>}
 
-        <Link to="/"><button className="btn secondary">⬅ Back</button></Link>
+        <Link to="/">
+          <button className="btn secondary">⬅ Back</button>
+        </Link>
       </div>
     </div>
   );
