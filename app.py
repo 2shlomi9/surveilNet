@@ -752,8 +752,9 @@ def api_match_boxes():
                     box = rec.get("box")
                     if not box or not isinstance(box, (list, tuple)) or len(box) != 4:
                         continue
+                    x1, y1, x2, y2 = map(float, box)
                     best_per_frame[fi] = {
-                        "box": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+                        "box": [x1, y1, max(0.0, x2 - x1), max(0.0, y2 - y1)],  # xywh
                         "score": float(score)
                     }
 

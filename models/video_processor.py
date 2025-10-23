@@ -143,6 +143,7 @@ class VideoProcessor:
                     break
 
                 ok, frame = cap.read()
+                h, w = frame.shape[:2]
                 if not ok:
                     # finalize progress to 100%
                     _render_progress(total_frames - 1, total_frames)
@@ -160,7 +161,8 @@ class VideoProcessor:
                     continue
 
                 boxes = self.detect_faces(frame)  # list of [x1,y1,x2,y2]
-                for box in boxes:
+                # save per det
+                for det_i, box in enumerate(boxes):
                     if self.stop_event and self.stop_event.is_set():
                         print("\n[INFO] Processing interrupted inside boxes loop.")
                         break
@@ -173,15 +175,16 @@ class VideoProcessor:
                     if emb is None:
                         continue
 
-                    # save embedding (npy)
-                    emb_path = os.path.join(embeds_dir, f"{frame_idx}.npy")
-                    np.save(emb_path, emb.astype(np.float32))
+                    # unique file names
+                    base_name = f"{frame_idx}_{det_i}"
+                    emb_path = os.path.join(embeds_dir, f"{base_name}.npy")
+                    thumb_path = os.path.join(thumbs_dir, f"{base_name}.jpg")
 
-                    # save thumbnail (jpg)
-                    thumb_path = os.path.join(thumbs_dir, f"{frame_idx}.jpg")
+                    # save to disk
+                    np.save(emb_path, emb.astype(np.float32))
                     cv2.imwrite(thumb_path, face_img)
 
-                    # compute absolute time for frame (if start_time provided)
+                    # calculate time
                     time_iso = None
                     if start_dt:
                         dt = start_dt + timedelta(seconds=float(frame_idx) / max(1.0, fps))
@@ -192,16 +195,19 @@ class VideoProcessor:
                             .replace("+00:00", "Z")
                         )
 
-                    # write metadata row (INCLUDES fps and box)
+                    # meta data
                     rec = {
                         "video": video_name,
                         "frame_idx": frame_idx,
+                        "det_i": det_i,
                         "fps": fps,
                         "place": location,
                         "time_iso": time_iso,
                         "thumb_path": os.path.abspath(thumb_path),
                         "embed_path": os.path.abspath(emb_path),
-                        "box": [int(v) for v in box],
+                        "box": [int(v) for v in box],  # [x1,y1,x2,y2]
+                        "frame_h": frame.shape[0],
+                        "frame_w": frame.shape[1],
                     }
                     meta_fp.write(json.dumps(rec, ensure_ascii=False) + "\n")
                     stored_faces += 1
