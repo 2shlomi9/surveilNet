@@ -25,6 +25,10 @@ import subprocess, shutil
 import imageio_ffmpeg
 from datetime import datetime
 import numpy as np
+from threading import BoundedSemaphore
+from configs import app_config as CFG
+from configs.app_config import settings
+from concurrent.futures import ThreadPoolExecutor
 
 # Project models
 from models.face_database import FaceDatabase
@@ -75,6 +79,9 @@ def handle_preflight():
 
 STOP_EVENT = threading.Event()
 
+# create a bounded thread pool based on config
+EXECUTOR = ThreadPoolExecutor(max_workers=settings.process_max_concurrency)
+
 # Folders
 UPLOAD_FOLDER = "uploads"
 VIDEO_FOLDER = "videos_database"
@@ -117,7 +124,13 @@ face_db = FaceDatabase()
 def _handle_sigint(signum, frame):
     print("\n[CTRL-C] Stopping now...", flush=True)
     STOP_EVENT.set()
+    try:
+        # cancel queued tasks; don't wait for running
+        EXECUTOR.shutdown(wait=False, cancel_futures=True)
+    except Exception:
+        pass
     os._exit(130)
+
 
 signal.signal(signal.SIGINT, _handle_sigint)
 
@@ -339,7 +352,7 @@ def upload_video():
         tmp_path   = os.path.join(VIDEO_TMP_FOLDER, f"{upload_id}_{filename}.part")
         final_path = os.path.join(VIDEO_FOLDER, filename)
 
-        chunk_size = 1024 * 1024
+        chunk_size = settings.upload_chunk_size_bytes
         bytes_written = 0
         try:
             with open(tmp_path, "wb") as out:
@@ -395,8 +408,17 @@ PROCESS_JOBS = {}  # job_id -> {"current": int, "total": int, "done": bool, "fil
 PROCESS_LOCK = threading.Lock()
 
 # === Job manager (in-memory) ===
-JOBS = {}  # job_id -> {"thread": Thread, "stop": Event, "progress": {...}}
+# job_id -> {
+#   "future": Future | None,
+#   "thread": Thread | None,      # kept for compatibility; not used once we submit to EXECUTOR
+#   "stop": Event,
+#   "progress": {...},
+#   "status": "queued" | "running" | "done" | "canceled" | "error",
+#   "filename": str,
+# }
+JOBS = {}
 JOBS_LOCK = threading.Lock()
+
 def make_progress_cb(job_id: str):
     def _cb(cur: int, total: int):
         with PROCESS_LOCK:
@@ -446,18 +468,21 @@ def process_video_async():
     if not os.path.exists(video_path):
         return jsonify({"error": f"Video not found: {filename}"}), 404
 
-    # צור job חדש
     job_id = str(uuid.uuid4())
     stop_ev = threading.Event()
     progress = _new_progress(filename)
 
     def progress_cb(done, total):
-        pct = int((done / total) * 100) if total else 0
+        pct = int((done / max(total, 1)) * 100) if total else 0
         _set_progress(job_id, frames_done=done, frames_total=total, percent=pct)
 
     def worker():
+        # mark as running
+        with JOBS_LOCK:
+            if job_id in JOBS:
+                JOBS[job_id]["status"] = "running"
         try:
-            # video_meta (אופציונלי)
+            # optional video meta
             meta_path = os.path.join(VIDEO_FOLDER, f"{filename}.json")
             video_meta = {}
             if os.path.exists(meta_path):
@@ -480,15 +505,37 @@ def process_video_async():
                 progress_cb=progress_cb,
             )
 
-            stats = processor.process_video(video_path)
+            processor.process_video(video_path)
             _set_progress(job_id, done=True, percent=100, finished_at=datetime.utcnow().isoformat() + "Z")
+
+            with JOBS_LOCK:
+                if job_id in JOBS:
+                    JOBS[job_id]["status"] = "done"
+
         except Exception as e:
             _set_progress(job_id, error=str(e), done=True, finished_at=datetime.utcnow().isoformat() + "Z")
+            with JOBS_LOCK:
+                if job_id in JOBS:
+                    JOBS[job_id]["status"] = "error"
 
-    th = threading.Thread(target=worker, name=f"process-{filename}", daemon=True)
+    # create the job record (status starts as queued; future is set right after submit)
     with JOBS_LOCK:
-        JOBS[job_id] = {"thread": th, "stop": stop_ev, "progress": progress}
-    th.start()
+        JOBS[job_id] = {
+            "future": None,
+            "thread": None,            # kept for compatibility with cancel handler
+            "stop": stop_ev,
+            "progress": progress,
+            "status": "queued",
+            "filename": filename,
+        }
+
+    # submit to the executor (bounded by config)
+    future = EXECUTOR.submit(worker)
+
+    # store the future for possible cancel-before-run
+    with JOBS_LOCK:
+        if job_id in JOBS:
+            JOBS[job_id]["future"] = future
 
     return jsonify({"job_id": job_id}), 202
 
@@ -503,15 +550,15 @@ def process_status():
         if not job:
             return jsonify({"error": "job not found"}), 404
         pr = job.get("progress") or {}
+        status = job.get("status", "unknown")
 
-        # values come from _set_progress(...) in process_video_async.worker
         frames_done  = int(pr.get("frames_done", 0))
         frames_total = int(pr.get("frames_total", 0))
         if frames_total <= 0:
             frames_total = max(frames_done, 1)
 
-        percent = int(max(0, min(100, pr.get("percent", 0))))
-        done    = bool(pr.get("done", False))
+        percent  = int(max(0, min(100, pr.get("percent", 0))))
+        done     = bool(pr.get("done", False))
         canceled = bool(pr.get("canceled", False))
         filename = pr.get("filename") or job.get("filename")
 
@@ -523,10 +570,12 @@ def process_status():
         "percent": percent,
         "done": done,
         "canceled": canceled,
+        "status": status,
         "error": pr.get("error"),
         "started_at": pr.get("started_at"),
         "finished_at": pr.get("finished_at"),
     }), 200
+
 
 @app.route("/api/process_cancel", methods=["POST"])
 def process_cancel():
@@ -546,15 +595,24 @@ def process_cancel():
     if not job:
         return jsonify({"error": "job not found"}), 404
 
-    # בקש מהעיבוד להיעצר
+    # Try cancel if still queued (future not started)
+    fut = job.get("future")
+    if fut and fut.cancel():
+        _set_progress(job_id, canceled=True, done=True, finished_at=datetime.utcnow().isoformat() + "Z")
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "canceled"
+        return jsonify({"message": "processing canceled (queued job)", "job_id": job_id}), 200
+
+    # Otherwise, it's likely running → request graceful stop
     job["stop"].set()
 
-    # ננסה להצטרף ל־thread לזמן קצר (לא חוסם לנצח)
-    job["thread"].join(timeout=2.0)
-
+    # Optional: if you previously had a thread handle, you can try join; now it's executor thread, so skip.
     _set_progress(job_id, canceled=True, done=True, finished_at=datetime.utcnow().isoformat() + "Z")
+    with JOBS_LOCK:
+        JOBS[job_id]["status"] = "canceled"
 
-    return jsonify({"message": "processing canceled", "job_id": job_id}), 200
+    return jsonify({"message": "processing cancel requested", "job_id": job_id}), 200
+
 
 # ----------------------------- Matches / Feed ----------------------------- #
 
@@ -980,7 +1038,8 @@ def api_video_snippet():
     """
     video = request.args.get("video") or ""
     frame_idx_q = request.args.get("frame_idx") or ""
-    window = float(request.args.get("window", 5))
+    default_window = settings.snippet_window_sec  # from config
+    window = float(request.args.get("window", default_window))
     annotate = str(request.args.get("annotate", "1")).lower() in ("1", "true", "yes")
 
     if not video or frame_idx_q == "":
@@ -1132,10 +1191,15 @@ def delete_all_matches():
 
 
 # ----------------------------- Main ----------------------------- #
-
 if __name__ == "__main__":
     USE_FIRESTORE = True
     if USE_FIRESTORE:
         face_db.load_from_firestore(db)
         print(f"[INFO] Loaded {len(face_db.people)} people from Firestore.")
-    app.run(debug=True, use_reloader=False, host="127.0.0.1", port=5000)
+
+    app.run(
+        debug=bool(settings.app_debug),
+        use_reloader=False,
+        host=settings.app_host,
+        port=int(settings.app_port),
+    )
