@@ -2,16 +2,34 @@
 
 ## 1. What is this project?
 
-SurveilNet ingests videos, detects faces frame-by-frame, aligns each face to a canonical view, extracts a 512-D embedding per face, and stores results in SQL Server.  
-Later, you can query the database with a single face image and retrieve matching frames/videos.
-
+SurveilNet is an end-to-end system for **video face detection**, **face recognition**, and **match visualization**, developed as a university final project.
 **Core capabilities:**
 - Video ingestion → faces + embeddings written to DB  
 - Gallery maintenance → per-person average embedding  
 - Query by image → find top matches across all stored frames  
 - Operational robustness (ROI clamping, configurable SQL connection, reproducible SQL schema)
 
+### The system:
+
+✅ Uploads and processes CCTV-like video streams  
+✅ Detects and indexes faces frame-by-frame  
+✅ Uploads a person photo and searches across all processed videos  
+✅ Displays the matching video segment with a **dynamic moving face box**
+
+This provides a realistic proof-of-concept for missing-person search and visual surveillance investigation workflows.
+
 ---
+## ✅ Core Capabilities
+
+| Feature | Description |
+|--------|-------------|
+| Video ingestion | Frame-by-frame face detection + embedding extraction |
+| Firestore database | Store enrolled people with embeddings |
+| Search | Upload an image → find best-matching frames in processed videos |
+| Visualization | Play snippet with **moving face box** synced to tracked identity |
+| Multi-user support | Parallel uploads and searches using async task pool |
+| Cancel-safety | Upload + processing can be individually canceled |
+| Robustness | ROI clamping, FPS normalization, snippet caching |
 
 ## 2. Project goals
 
@@ -19,7 +37,7 @@ Later, you can query the database with a single face image and retrieve matching
 - **Stable, comparable embeddings** via alignment + FaceNet  
 - **Simple, explainable pipeline** using well-known models  
 - **Operational robustness** (no ROI crashes, handle GPU/CPU constraints)  
-- **Reproducible setup** (config file, SQL scripts, clear commands)  
+- **Concurrency Jobs** using multithreaded flask server
 
 ---
 
@@ -34,6 +52,8 @@ Later, you can query the database with a single face image and retrieve matching
 - **What**: Lightweight detector/aligner  
 - **Why**: Produces normalized 160×160 crops for stable embeddings  
 - **Role**: Align face crops for FaceNet input
+- 
+➡ *This step greatly improves match reliability. Without alignment — similarity drops dramatically.*
 
 ### FaceNet – InceptionResnetV1
 - **What**: Embedding model (512-D vectors)  
@@ -41,27 +61,15 @@ Later, you can query the database with a single face image and retrieve matching
 - **Role**: Generate embeddings for DB and search
 
 ### Cosine Similarity
-- **What**: Measure similarity of normalized vectors  
-- **Why**: Simple and effective metric for embeddings  
-- **Role**: Compare new faces against gallery/DB
-
-### OpenCV Trackers (optional)
-- **What**: Appearance-based tracking between detections  
-- **Why**: Reduce detection frequency  
-- **Trade-off**: Trackers drift; optional in our pipeline
-
-### ROI Clamping
-- **What**: Clamp bboxes to frame, discard invalids  
-- **Why**: Prevent empty crops and crashes  
-- **Role**: Stabilize pipeline
+- **Why:** Simple, fast, scale-invariant
+- **Role:** Person search → find best scores per frame
 
 ---
 
 ## 4. Installation & dependencies
 
 ### 4.1 Prerequisites
-- Python 3.9+  
-- Microsoft ODBC Driver 17/18 for SQL Server  
+- Python 3.9+
 - (Optional) NVIDIA GPU + CUDA/cuDNN  
 
 ### 4.2 Python packages
@@ -73,93 +81,75 @@ pip install retinaface tensorflow==2.*
 ```
 See requirements.txt for more information.
 
-### 4.3 Configuration
+## 🎥 Video Snippet Playback & Moving Face Box
 
-`config/host_info.ini` (gitignored).
+When a match is found:
 
-**Windows Authentication:**
-```ini
-[sqlserver]
-driver = ODBC Driver 17 for SQL Server
-server = YourServer
-database = YourDB
-trusted_connection = yes - if using Windows Authentication, no - if using SQL SERVER Authentication
-username = fill if trusted_connection = no
-password = fill if trusted_connection = no
-```
-# Database & Scripts Documentation
+1️⃣ A short H.264 snippet is generated around the matched frame  
+2️⃣ For each frame in the snippet — the best matching detection is loaded  
+3️⃣ A **sticky** tracking system keeps box visible even in low-confidence frames  
 
-## 4.4 Database schema
+✅ Result: The box **follows the same identity**, not random faces in the video.
+---
 
-Run the following SQL scripts in **SQL Server Management Studio** to create and prepare the database schema:
--sql_queries/create_tables.sql
--sql_queries/indexes.sql
+## ⚙️ Processing Pipeline (Video)
+
+For each uploaded video:
+
+1. Read frames (downsample by skip=5 for speed)
+2. Detect faces → RetinaFace  
+3. Clamp bounding boxes to frame
+4. Align crops → MTCNN  
+5. Generate embedding → FaceNet  
+6. Save `{frame_idx, bbox, embedding, fps}` to disk (frame_store/)  
+7. Track async progress (polling from frontend)
+
+✅ GPU is used when available  
+✅ Multiple concurrent jobs via semaphore-limited worker threads
 
 ---
 
-## 6. Scripts
+## 👤 Person Enrollment Pipeline
 
-### 6.1 video_face_extractor.py
+1. User uploads 1+ images
+2. RetinaFace detects faces in the images
+3. MTCNN aligns each face crop
+4. FaceNet → embeddings
+5. Average embedding saved in Firestore for that identity
+6. Immediately search over all processed frames
+7. Show best match (if score > threshold)
 
-**Purpose**:  
-Process videos in `videos_database/`, detect faces, embed them, and insert results into SQL Server.
+---
 
-**Flow**:
-1. Connect to DB (from config)  
-2. For each `.mp4` file:  
-   - Detect with RetinaFace  
-   - Clamp boxes  
-   - Align with MTCNN  
-   - Embed with FaceNet  
-   - Match to gallery (cosine sim, threshold)  
-   - Insert row in `FaceEmbeddings` + update `FaceGallery`  
-   - Print logs for monitoring  
+## 🛠 Tech Stack
 
-**Run**:
-```bash
-python video_face_extractor.py
-```
+| Area | Tool |
+|------|-----|
+| Backend | Flask (Python) |
+| Face Detection | RetinaFace |
+| Alignment | MTCNN |
+| Embeddings | FaceNet (facenet-pytorch) |
+| Frontend | React.js |
+| Storage (people) | Google Firestore |
+| Storage (frames) | Local frame_store/ |
+| Snippet Encoding | OpenCV + ffmpeg auto-H.264 |
+| Parallelism | Python threading + semaphore |
+| Modal UX | Custom React player w/ overlay canvas |
 
-### 6.2 face_query_search.py
-
-Purpose:
-Search the database for matches to a query image.
-
-Flow:
-- Load query image
-- Detect/align with MTCNN
-- Embed with FaceNet
-- Fetch embeddings from DB
-- Compare with cosine similarity
-- Display/save top matches
-
-Run:
-```bash
-python face_query_search.py --image path/to/query.jpg --topk 5
-```
 
 Output:
 - Console similarity scores + metadata
 - Cropped face results saved in matches/
 
-7. Performance tips
+## Performance tips
 - Downscale frames before detection
 - Use frame skipping (detect every N frames)
 - Split TF on CPU & FaceNet on GPU (or vice-versa)
-- Use ROI clamping (already included)
-- Batch DB writes to reduce overhead
 
-8. Troubleshooting
 
-- Empty ROI crash → fixed by clamp logic
-- GPU OOM → run one framework on CPU, other on GPU
-- Missing CSRT tracker → use opencv-contrib-python or legacy API
-- ODBC SSL error → add Encrypt=yes;TrustServerCertificate=yes;
-
-9. Why these choices?
+## Why these choices?
 
 - RetinaFace → reliable detection + landmarks
 - MTCNN → convenient alignment
 - FaceNet → proven embeddings
 - Cosine similarity → simple + effective
-- SQL Server → reliable storage, easy queries
